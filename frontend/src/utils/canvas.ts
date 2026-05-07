@@ -47,19 +47,19 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
     grad.addColorStop(0, "rgba(10,16,40,0.92)");
     grad.addColorStop(1, "rgba(4,8,25,0.96)");
   } else {
-    grad.addColorStop(0, "rgba(255,254,252,0.97)");
-    grad.addColorStop(1, `${palette.border}18`);
+    grad.addColorStop(0, "rgba(255,255,255,0.97)");
+    grad.addColorStop(1, `${palette.border}42`);
   }
-  ctx.shadowColor = isNew ? palette.shadow : (isSpace ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.18)");
-  ctx.shadowBlur = isNew ? 24 : 10;
+  ctx.shadowColor = isNew ? palette.shadow : (isSpace ? "rgba(0,0,0,0.5)" : `${palette.shadow}`);
+  ctx.shadowBlur = isNew ? 24 : 12;
   ctx.fillStyle = grad;
   roundRect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, 12);
   ctx.fill();
 
   // Border
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = isNew ? palette.border : `${palette.border}88`;
-  ctx.lineWidth = isNew ? 2 : 1.5;
+  ctx.strokeStyle = palette.border;
+  ctx.lineWidth = isNew ? 2.5 : 2;
   roundRect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, 12);
   ctx.stroke();
 
@@ -78,9 +78,9 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
   ctx.stroke();
   ctx.restore();
 
-  // Name text — dark on sky cards, light on space cards
+  // Name text — palette color on sky cards (bright + distinct), light on space cards
   ctx.shadowBlur = 0;
-  ctx.fillStyle = isSpace ? palette.lightText : palette.darkText;
+  ctx.fillStyle = isSpace ? palette.lightText : palette.border;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(sig.name, 0, sig.signature ? -sigH / 2 : 0);
@@ -118,6 +118,10 @@ function drawSignatureImage(
     const el = new Image();
     el.src = b64;
     _imgCache.set(b64, el);
+    // Evict oldest entry when cache exceeds 300 items
+    if (_imgCache.size > 300) {
+      _imgCache.delete(_imgCache.keys().next().value!);
+    }
   }
 }
 

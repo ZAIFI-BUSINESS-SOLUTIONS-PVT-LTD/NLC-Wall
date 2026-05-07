@@ -8,6 +8,7 @@ export default defineConfig({
       "/submit": "http://localhost:8000",
       "/signatures": "http://localhost:8000",
       "/health": "http://localhost:8000",
+      "^/admin/": "http://localhost:8000",
       "/ws": {
         target: "ws://localhost:8000",
         ws: true,

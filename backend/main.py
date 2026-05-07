@@ -1,7 +1,17 @@
 import uuid
 import time
-import base64
+import logging
 from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("signwall.log", encoding="utf-8"),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -88,24 +98,31 @@ async def set_display_theme(body: ThemeBody) -> JSONResponse:
 
 @app.post("/admin/save-images")
 async def admin_save_images() -> JSONResponse:
-    export_dir = Path(__file__).parent.parent / "exports"
-    export_dir.mkdir(exist_ok=True)
+    """Re-saves any in-memory signatures not yet on disk (e.g. after a restart)."""
     saved = 0
     for sig in storage.get_all():
         if sig.signature:
-            try:
-                _, b64_data = sig.signature.split(",", 1)
-                img_bytes = base64.b64decode(b64_data)
-                safe_name = "".join(
-                    c if c.isalnum() or c in (" ", "-", "_") else "_"
-                    for c in sig.name
-                )[:30].strip()
-                filename = f"{sig.timestamp}_{safe_name or 'sig'}.png"
-                (export_dir / filename).write_bytes(img_bytes)
+            import datetime as _dt
+            dt = _dt.datetime.fromtimestamp(sig.timestamp / 1000)
+            date_str = dt.strftime("%Y-%m-%d")
+            day_dir = storage.SIGNATURES_DIR / date_str
+            filename = f"{sig.timestamp}_{sig.id[:8]}.png"
+            if not (day_dir / filename).exists():
+                storage._save_to_disk(sig)
                 saved += 1
-            except Exception:
-                pass
-    return JSONResponse({"saved": saved, "dir": str(export_dir)})
+
+    # Build a summary of what's on disk
+    folders: dict = {}
+    if storage.SIGNATURES_DIR.exists():
+        for day_dir in sorted(storage.SIGNATURES_DIR.iterdir()):
+            if day_dir.is_dir():
+                folders[day_dir.name] = len(list(day_dir.glob("*.png")))
+
+    return JSONResponse({
+        "newly_saved": saved,
+        "signatures_dir": str(storage.SIGNATURES_DIR),
+        "folders": folders,
+    })
 
 
 @app.websocket("/ws")
@@ -123,16 +140,36 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         await manager.disconnect(ws)
 
 
-# Serve built frontend — must come last so API routes take priority
+# Serve built frontend.
+# Starlette 1.x changed route priority for {path:path} and "/" mounts.
+# Use fully-explicit routes so API routes defined above always win.
 _static_dir = Path(__file__).parent.parent / "frontend" / "dist"
 if _static_dir.exists():
     _assets_dir = _static_dir / "assets"
     if _assets_dir.is_dir():
         app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
 
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str) -> FileResponse:
-        candidate = _static_dir / full_path
-        if candidate.is_file():
-            return FileResponse(str(candidate))
-        return FileResponse(str(_static_dir / "index.html"))
+    _idx = str(_static_dir / "index.html")
+
+    @app.get("/", include_in_schema=False)
+    async def _root() -> FileResponse:
+        return FileResponse(_idx)
+
+    @app.get("/display", include_in_schema=False)
+    async def _display_page() -> FileResponse:
+        return FileResponse(_idx)
+
+    @app.get("/admin", include_in_schema=False)
+    async def _admin_page() -> FileResponse:
+        return FileResponse(_idx)
+
+    # Serve every non-HTML file sitting in dist root (images, favicon, etc.)
+    for _sf in _static_dir.iterdir():
+        if _sf.is_file() and _sf.suffix != ".html":
+            _sfp = str(_sf)
+            app.add_api_route(
+                f"/{_sf.name}",
+                (lambda p: lambda: FileResponse(p))(_sfp),
+                methods=["GET"],
+                include_in_schema=False,
+            )

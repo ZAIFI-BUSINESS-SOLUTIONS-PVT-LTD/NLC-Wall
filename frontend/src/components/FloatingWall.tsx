@@ -15,6 +15,7 @@ interface CloudDef {
   size: number;
   speed: number;
   alpha: number;
+  targetAlpha: number;
 }
 
 export function FloatingWall({ signatures, newSig, displayTheme }: Props): React.ReactElement {
@@ -32,13 +33,17 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
   }, [displayTheme]);
 
   const initClouds = useCallback((w: number, h: number) => {
-    cloudsRef.current = Array.from({ length: 8 }, (_, i) => ({
-      x: Math.random() * w,
-      y: h * (0.04 + (i / 8) * 0.38),
-      size: 90 + Math.random() * 130,
-      speed: 6 + Math.random() * 14,
-      alpha: 0.5 + Math.random() * 0.3,
-    }));
+    cloudsRef.current = Array.from({ length: 11 }, (_, i) => {
+      const targetAlpha = 0.50 + Math.random() * 0.35;
+      return {
+        x: Math.random() * (w + 400) - 200,
+        y: h * (0.02 + (i / 11) * 0.40),
+        size: 70 + Math.random() * 180,
+        speed: 3 + Math.random() * 13,
+        alpha: targetAlpha,
+        targetAlpha,
+      };
+    });
   }, []);
 
   // Sync items with signatures prop
@@ -97,7 +102,14 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
         drawSkyBg(ctx, W, H);
         for (const cloud of cloudsRef.current) {
           cloud.x += cloud.speed * dt;
-          if (cloud.x > W + cloud.size * 2) cloud.x = -cloud.size * 2;
+          // Reset off-screen left and fade in instead of teleporting at full alpha
+          if (cloud.x > W + cloud.size * 2) {
+            cloud.x = -cloud.size * 2;
+            cloud.alpha = 0;
+          }
+          if (cloud.alpha < cloud.targetAlpha) {
+            cloud.alpha = Math.min(cloud.alpha + dt * 0.5, cloud.targetAlpha);
+          }
           drawCloud(ctx, cloud.x, cloud.y, cloud.size, cloud.alpha);
         }
       } else {
@@ -133,25 +145,32 @@ function drawSkyBg(ctx: CanvasRenderingContext2D, w: number, h: number): void {
 function drawCloud(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, alpha: number): void {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.shadowColor = "rgba(100,180,230,0.35)";
-  ctx.shadowBlur = 18;
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
 
-  const parts: [number, number, number, number][] = [
-    [0,             0,          size * 0.55, size * 0.38],
-    [-size * 0.44,  size * 0.12, size * 0.36, size * 0.30],
-    [size * 0.44,   size * 0.10, size * 0.38, size * 0.32],
-    [-size * 0.20, -size * 0.17, size * 0.30, size * 0.26],
-    [size * 0.22,  -size * 0.20, size * 0.28, size * 0.24],
-    [-size * 0.72,  size * 0.18, size * 0.26, size * 0.22],
-    [size * 0.74,   size * 0.16, size * 0.24, size * 0.21],
-  ];
+  const r = size * 0.42;
 
-  for (const [dx, dy, rx, ry] of parts) {
-    ctx.beginPath();
-    ctx.ellipse(cx + dx, cy + dy, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Shadow pass — draw filled shape slightly larger with blur
+  ctx.shadowColor = "rgba(100,170,230,0.38)";
+  ctx.shadowBlur = 28;
+  ctx.fillStyle = "rgba(255,255,255,0.93)";
+
+  // Build one compound path of overlapping circles = natural cloud silhouette
+  ctx.beginPath();
+  ctx.arc(cx,            cy + r * 0.18, r * 0.88, 0, Math.PI * 2);   // main body
+  ctx.arc(cx - r * 0.80, cy + r * 0.28, r * 0.60, 0, Math.PI * 2);   // left lobe
+  ctx.arc(cx + r * 0.80, cy + r * 0.28, r * 0.62, 0, Math.PI * 2);   // right lobe
+  ctx.arc(cx - r * 0.40, cy - r * 0.28, r * 0.58, 0, Math.PI * 2);   // upper-left bump
+  ctx.arc(cx + r * 0.38, cy - r * 0.30, r * 0.55, 0, Math.PI * 2);   // upper-right bump
+  ctx.arc(cx,            cy - r * 0.65, r * 0.48, 0, Math.PI * 2);    // top peak
+  ctx.fill();
+
+  // Bright highlight on upper-left to give 3-D fluffiness
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = alpha * 0.45;
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.22, cy - r * 0.52, r * 0.30, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 

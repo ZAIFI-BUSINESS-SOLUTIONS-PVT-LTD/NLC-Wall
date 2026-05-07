@@ -93,7 +93,7 @@ export function AdminPage(): React.ReactElement {
       const res = await fetch("/admin/save-images", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        setExportMsg(`Saved ${data.saved} image${data.saved !== 1 ? "s" : ""} → ${data.dir}`);
+        setExportMsg(`Saved ${data.newly_saved} image${data.newly_saved !== 1 ? "s" : ""} → ${data.signatures_dir}`);
       } else {
         setExportMsg("Failed to save images.");
       }
@@ -112,9 +112,22 @@ export function AdminPage(): React.ReactElement {
       const sigs: { name: string; signature: string | null; timestamp: number }[] = await res.json();
       if (sigs.length === 0) { setExportMsg("No signatures to export."); return; }
 
+      // Pre-load all signature images before touching the canvas
+      const images = await Promise.all(
+        sigs.map((sig) => {
+          if (!sig.signature) return Promise.resolve<HTMLImageElement | null>(null);
+          return new Promise<HTMLImageElement | null>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = sig.signature!;
+          });
+        }),
+      );
+
       const cols = Math.min(4, sigs.length);
       const cardW = 320;
-      const cardH = 100;
+      const cardH = 120;
       const pad = 16;
       const rows = Math.ceil(sigs.length / cols);
       const sheetW = cols * (cardW + pad) + pad;
@@ -145,6 +158,7 @@ export function AdminPage(): React.ReactElement {
         const cx = pad + col * (cardW + pad);
         const cy = 52 + row * (cardH + pad);
         const color = COLORS[(sig.name.charCodeAt(0) + sig.name.length) % COLORS.length];
+        const img = images[i];
 
         ctx.save();
         ctx.shadowColor = `${color}44`;
@@ -167,7 +181,18 @@ export function AdminPage(): React.ReactElement {
         ctx.font = "bold 18px 'Noto Sans Tamil', sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(sig.name, cx + cardW / 2, cy + (sig.signature ? 28 : cardH / 2));
+        const nameY = img ? cy + 22 : cy + cardH / 2;
+        ctx.fillText(sig.name, cx + cardW / 2, nameY);
+
+        if (img) {
+          const sigAreaY = cy + 36;
+          const sigAreaH = cardH - 44;
+          const sigAreaW = cardW - 24;
+          const ratio = Math.min(sigAreaW / img.naturalWidth, sigAreaH / img.naturalHeight);
+          const dw = img.naturalWidth * ratio;
+          const dh = img.naturalHeight * ratio;
+          ctx.drawImage(img, cx + (cardW - dw) / 2, sigAreaY, dw, dh);
+        }
       });
 
       canvas.toBlob((blob) => {

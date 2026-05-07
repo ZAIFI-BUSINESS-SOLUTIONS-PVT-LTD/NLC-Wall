@@ -30,3 +30,4 @@ desktop.ini
 
 # Signatures data (runtime only)
 signatures.json
+signatures/

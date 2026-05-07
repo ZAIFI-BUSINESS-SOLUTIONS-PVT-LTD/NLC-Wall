@@ -1,0 +1,32 @@
+# Python
+backend/__pycache__/
+backend/*.pyc
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.env
+venv/
+env/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code project settings
+.claude/
+
+# Signatures data (runtime only)
+signatures.json

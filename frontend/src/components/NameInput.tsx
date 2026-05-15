@@ -9,7 +9,9 @@ interface Props {
 export function NameInput({ value, onChange, disabled }: Props): React.ReactElement {
   return (
     <div className="name-input-wrap">
-      <label htmlFor="name-field" className="input-label">Your Name</label>
+      <label htmlFor="name-field" className="input-label">
+        Your Name
+      </label>
       <input
         id="name-field"
         type="text"
@@ -17,10 +19,11 @@ export function NameInput({ value, onChange, disabled }: Props): React.ReactElem
         onChange={(e) => onChange(e.target.value)}
         maxLength={60}
         disabled={disabled}
-        placeholder="Enter your name"
+        placeholder="Name"
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
+        autoFocus
         className="name-input"
       />
       <div className="char-count">{value.length} / 60</div>

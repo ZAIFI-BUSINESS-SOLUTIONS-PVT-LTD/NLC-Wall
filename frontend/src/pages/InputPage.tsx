@@ -10,6 +10,8 @@ export function InputPage(): React.ReactElement {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [canvasResetToken, setCanvasResetToken] = useState(0);
+  // Captured before name is cleared so the success overlay can show it
+  const [lastSubmittedName, setLastSubmittedName] = useState("");
 
   const handleSubmit = useCallback(async () => {
     const trimmed = name.trim();
@@ -31,11 +33,13 @@ export function InputPage(): React.ReactElement {
         throw new Error(typeof detail === "string" ? detail : "Submission failed");
       }
 
+      setLastSubmittedName(trimmed); // capture before clearing
       setStatus("success");
       setName("");
       setSignatureData(null);
       setCanvasResetToken((t) => t + 1);
-      setTimeout(() => setStatus("idle"), 3500);
+      // 5000ms — long enough to walk to the display wall and find your card
+      setTimeout(() => setStatus("idle"), 5000);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Submission failed");
       setStatus("error");
@@ -55,28 +59,37 @@ export function InputPage(): React.ReactElement {
       </header>
 
       <main className="input-form">
-        <NameInput value={name} onChange={setName} disabled={isSubmitting} />
-        <SignatureCanvas
-          onExport={setSignatureData}
-          disabled={isSubmitting}
-          resetToken={canvasResetToken}
-        />
-
-        <button
-          className="btn-submit"
-          onClick={handleSubmit}
-          disabled={isSubmitting || name.trim().length === 0}
-        >
-          {isSubmitting ? "Submitting…" : "✦ Submit to Wall"}
-        </button>
-
-        {status === "success" && (
-          <div className="feedback success">
-            🎉 Your name is now on the wall!
+        {status === "success" ? (
+          // Full-card ceremony overlay — replaces form on success.
+          // Tells the person exactly what happened and where to look.
+          <div className="success-overlay">
+            <div className="success-check">✓</div>
+            <div className="success-headline">You're on the wall!</div>
+            <div className="success-name">{lastSubmittedName}</div>
+            <div className="success-sub">Your name is now floating on the big screen!</div>
+            <div className="success-look">👆 Look at the display wall now</div>
           </div>
-        )}
-        {status === "error" && (
-          <div className="feedback error">{errorMsg}</div>
+        ) : (
+          <>
+            <NameInput value={name} onChange={setName} disabled={isSubmitting} />
+            <SignatureCanvas
+              onExport={setSignatureData}
+              disabled={isSubmitting}
+              resetToken={canvasResetToken}
+            />
+
+            <button
+              className="btn-submit"
+              onClick={handleSubmit}
+              disabled={isSubmitting || name.trim().length === 0}
+            >
+              {isSubmitting ? "Submitting…" : "✦ Submit to Wall"}
+            </button>
+
+            {status === "error" && (
+              <div className="feedback error">{errorMsg}</div>
+            )}
+          </>
         )}
       </main>
 

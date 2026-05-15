@@ -359,3 +359,215 @@ Windows may be throttling the hotspot radio. Plug the server laptop into power (
 ```
 Settings → System → Power & Sleep → Additional power settings → High performance
 ```
+
+---
+
+## Part 4 — Installation Experience Upgrade Plan
+
+> Added 2026-05-14 after full UX/installation audit.
+> This is NOT a web-app feature list. Every item is evaluated as a live public installation.
+
+---
+
+### Philosophy shift
+
+The system must stop being a "web app on a big screen" and become an **interactive installation** where:
+
+- Every person who signs sees a **ceremony moment**, not a form submit
+- Every bystander sees **something they want to join**
+- The display wall has **visual life** independent of new submissions
+- Operators can diagnose problems **at a glance** from across the room
+- The system **survives 6 hours, power blips, and network hiccups** without operator intervention
+
+---
+
+### Severity key (mirrors Part 1)
+
+| Level | Meaning |
+|-------|---------|
+| **P0 — Critical** | Will cause visible failure or immersion break at the event |
+| **P1 — High** | Significantly degrades crowd experience or participation |
+| **P2 — Medium** | Premium polish; notable improvement but event survives without it |
+
+---
+
+### P0 — Critical (ship blockers)
+
+| ID | Area | Problem | Affected File(s) | Complexity | Rollback |
+|----|------|---------|-----------------|------------|---------|
+| X-01 | Immersion | Admin gear `⚙` visible to all visitors on display wall | `DisplayPage.tsx:64` | Trivial | 1-line revert |
+| X-02 | Crowd UX | New signature toast is 15px, bottom-right — invisible from 3m | `DisplayPage.tsx`, `index.css` | Low | CSS-only revert |
+| X-03 | Performance | Sky background gradient re-created every frame (18k allocs/min) | `FloatingWall.tsx:136` | Low | Revert cache vars |
+| X-04 | Performance | `toDataURL()` called on every `touchmove` pixel — causes input lag on tablets | `SignatureCanvas.tsx:87` | Low | Revert rAF wrapper |
+| X-05 | Crowd UX | New card appears at random screen position — crowd can't find their name | `animation.ts:createItem` | Medium | Revert field additions |
+| X-06 | Performance | O(n²) separation at 300+ cards will cause visible frame drops | `animation.ts:109` | Medium | Frequency throttle |
+
+---
+
+### P1 — High (strong participation/engagement impact)
+
+| ID | Area | Improvement | Affected File(s) | Complexity | Rollback |
+|----|------|------------|-----------------|------------|---------|
+| Y-01 | Tamil UX | All input labels English-only; tablet visitors are Tamil-first | `NameInput.tsx` | Trivial | Text revert |
+| Y-02 | Tablet UX | Name input requires a tap to focus — extra friction at kiosk | `NameInput.tsx` | Trivial | Remove `autoFocus` |
+| Y-03 | Tablet UX | Signature canvas looks mandatory (dashed border, no label) | `SignatureCanvas.tsx` | Low | CSS + label revert |
+| Y-04 | Ceremony | Success state is a 14px green text box — no "look at the screen" moment | `InputPage.tsx`, `index.css` | Low | JSX revert |
+| Y-05 | Display | Count number jumps instantly — missed animation opportunity | `DisplayPage.tsx` | Low | Remove hook |
+| Y-06 | Display | Card boundary pad = 70px — 14% of screen real estate wasted | `animation.ts:87` | Trivial | Revert constant |
+| Y-07 | Display | Oldest cards fade to 30% opacity — early participants feel erased | `animation.ts:97` | Trivial | Revert lerp min |
+| Y-08 | Reliability | Server restart loses all in-memory signatures | `storage.py`, `main.py` | Medium | Feature flag env var |
+| Y-09 | Reliability | Auto-restart watchdog missing from `start_server.bat` | `start_server.bat` | Low | Revert bat file |
+| Y-10 | Reliability | Wake Lock not set on tablets — screens sleep mid-event | `InputPage.tsx` | Low | Remove useEffect |
+
+---
+
+### P2 — Medium (premium polish)
+
+| ID | Area | Improvement | Complexity | Rollback |
+|----|------|------------|------------|---------|
+| Z-01 | Animation | Spring/elastic entry easing (overshoot and settle) | Low | Swap easing fn |
+| Z-02 | Animation | Entry shockwave ring expanding from card origin | Medium | Remove shockwave array |
+| Z-03 | Crowd | QR code on display wall pointing to tablet URL | Low | Remove component |
+| Z-04 | Ceremony | Participant number badge after submission (#247) | Medium | Backend + frontend |
+| Z-05 | Ceremony | Card palette color shown on tablet after success | Low | Remove hint |
+| Z-06 | Crowd | Milestone celebrations at 100/200/300/500 signatures | Medium | Remove milestone logic |
+| Z-07 | Animation | Ambient sparkle particles from floating cards | Medium | Remove sparkle array |
+| Z-08 | Display | Depth-stratified motion speed (parallax illusion) | Low | Revert speed factor |
+| Z-09 | Display | Name ticker marquee at bottom of wall | Medium | Remove ticker |
+| Z-10 | Reliability | WebSocket connection indicator (green/red dot) on display | Low | Remove indicator |
+
+---
+
+### Animation philosophy
+
+**Before:** Cards appear anywhere, drift randomly, older cards fade toward invisible. Passive, static.
+
+**After:** Every new card enters from a **fixed, predictable zone** (bottom-center) so the crowd knows where to look. Cards drift with **depth-stratified speed** (small = slower = feels further away). The wall **breathes** — no frame is identical to the previous. Older participants remain **legible** (opacity min 0.55 vs previous 0.30).
+
+Core motion rules:
+1. Entry: fixed zone → target position, spring easing, 0.7s
+2. Float: sine-wave drift + slow velocity + bounce walls at 24px (not 70px)
+3. Depth: `depthFactor = 0.4 + scale * 0.45` applied to velocity
+4. Glow: 5s decay (not 3s) — new entries stay highlighted longer
+
+---
+
+### Tablet experience philosophy
+
+**Goal:** Zero hesitation between arriving at the tablet and seeing your name on screen.
+
+Rules:
+1. Name field is **auto-focused** — no first tap required
+2. Signature is **visibly optional** — "விருப்பம் / Optional" label + skip affordance
+3. Submit button is **tall** (≥56px touch target)
+4. Success state **fills the card** and tells you exactly what to do: "Look at the display wall!"
+5. Error messages are in **Tamil first**, English second
+6. Wake Lock prevents screen sleep on idle tablets
+
+---
+
+### Display wall philosophy
+
+**Goal:** The wall must feel **cinematic and alive**, not like a browser tab.
+
+Rules:
+1. No technical scaffolding visible (no admin gear, no IP text)
+2. New signature toast is **unmissable from the back of the crowd** (top-center, 22px+, 5s)
+3. Counter animates when it increments — even +1 should feel like a milestone
+4. Every card uses the **full screen** — boundary pad reduced from 70px to 24px
+5. The background is **never static** — sky gradient cached but space hue rotates, stars twinkle
+
+---
+
+### Event-day reliability priorities
+
+In order of risk:
+1. Server auto-restart watchdog in `start_server.bat`
+2. SQLite persistence so restart doesn't lose data
+3. WebSocket status indicator visible to operator
+4. Offline submit queue on tablets (localStorage retry)
+5. Wake Lock on all tablet pages
+
+---
+
+## Part 5 — Implementation Roadmap
+
+> Execution order: safest + highest ROI first. Each group is independently shippable.
+
+---
+
+### Group 1 — Critical fixes (do these first, zero architectural risk)
+
+| Order | Change | Files | Why first |
+|-------|--------|-------|-----------|
+| 1 | Hide admin gear behind `?admin` URL param | `DisplayPage.tsx` | 1-line fix, breaks immersion today |
+| 2 | Tamil labels + autoFocus on name input | `NameInput.tsx` | Zero risk, immediate participation lift |
+| 3 | Signature optional badge + label | `SignatureCanvas.tsx` | Removes #1 tablet hesitation point |
+| 4 | Debounce `toDataURL` to rAF | `SignatureCanvas.tsx` | Fixes input lag, zero visual change |
+| 5 | Sky gradient cache (module-level) | `FloatingWall.tsx` | 18k → 1 gradient alloc/min, zero visual change |
+
+---
+
+### Group 2 — UX upgrades (high crowd impact, low risk)
+
+| Order | Change | Files | Impact |
+|-------|--------|-------|--------|
+| 6 | Large success overlay with name + "look at screen" | `InputPage.tsx`, `index.css` | Ceremony moment — highest participation retention |
+| 7 | Animated rolling counter on display | `DisplayPage.tsx` | Every new signature feels like an event |
+| 8 | Toast → top-center, 22px font, 5s duration | `DisplayPage.tsx`, `index.css` | Visible from back of crowd |
+| 9 | Wake Lock on tablet input page | `InputPage.tsx` | Prevents mid-event screen sleep |
+
+---
+
+### Group 3 — Animation upgrades (medium risk, verify visually)
+
+| Order | Change | Files | Impact |
+|-------|--------|-------|--------|
+| 10 | Fixed entry zone (bottom-center → float target) | `animation.ts`, `FloatingWall.tsx` | Crowd knows where to look for new entries |
+| 11 | Reduce boundary pad 70px → 24px | `animation.ts` | Full screen utilization |
+| 12 | Opacity min 0.30 → 0.55, scale min 0.60 → 0.75 | `animation.ts` | Early participants remain legible |
+| 13 | Depth-stratified motion speed | `animation.ts` | Parallax depth, no perf cost |
+| 14 | Entry shockwave ring | `canvas.ts`, `FloatingWall.tsx` | Visceral "arrival" feel |
+
+---
+
+### Group 4 — Performance optimizations (do before Group 3 if card count > 200)
+
+| Order | Change | Files | Impact |
+|-------|--------|-------|--------|
+| 15 | O(n²) → spatial grid separation | `animation.ts` | Prevents frame drops at 200+ cards |
+| 16 | Skip off-screen card draw | `FloatingWall.tsx` | Free perf at boundary zones |
+| 17 | Separation frequency throttle (every-2nd frame at 150+ items) | `animation.ts` | Halves collision cost during peak |
+
+---
+
+### Group 5 — Reliability hardening (do day before event)
+
+| Order | Change | Files | Impact |
+|-------|--------|-------|--------|
+| 18 | Auto-restart watchdog in `start_server.bat` | `start_server.bat` | No operator intervention on crash |
+| 19 | SQLite persistence layer | `storage.py`, `main.py` | Restart-safe signature storage |
+| 20 | WebSocket status dot on display | `DisplayPage.tsx`, `index.css` | Operator sees health at a glance |
+| 21 | Offline submit queue (localStorage retry) | `InputPage.tsx` | Brief WiFi blip loses nothing |
+
+---
+
+### Group 6 — Premium enhancements (if time allows)
+
+| Order | Change | Files | Impact |
+|-------|--------|-------|--------|
+| 22 | QR code on display wall | `DisplayPage.tsx` | Doubles participation surface area |
+| 23 | Participant number badge | `InputPage.tsx`, `backend/main.py` | Collector's identity moment |
+| 24 | Milestone celebrations | `DisplayPage.tsx`, `animation.ts` | Crowd events at 100/200/500 |
+| 25 | Ambient sparkle system | `canvas.ts` | Wall always looks alive |
+| 26 | Name ticker marquee | `DisplayPage.tsx`, `index.css` | Guaranteed name visibility |
+
+---
+
+### What NOT to implement before event day
+
+- Do not switch to PixiJS/WebGL — the canvas renderer is stable and correct
+- Do not add any npm packages (except `qrcode.react` for QR, which is zero-dep)
+- Do not restructure the WebSocket protocol
+- Do not change the FastAPI backend routing
+- Do not add React Router or additional routing libraries

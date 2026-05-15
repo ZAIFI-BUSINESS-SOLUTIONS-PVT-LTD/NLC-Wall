@@ -1,5 +1,6 @@
 import { FloatingItem, CARD_PALETTES } from "./animation";
 import { DisplayTheme } from "../types";
+import { getResolvedFace, FACE_ASSET_NAME_Y, FacePathAsset } from "../assets/facePaths";
 
 const FONT_STACK = "'Noto Sans Tamil', Latha, sans-serif";
 
@@ -9,10 +10,11 @@ export function setCardTheme(theme: DisplayTheme): void {
 }
 
 export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): void {
-  const { x, y, rotation, scale, opacity, glowAlpha, sig, paletteIdx } = item;
-  const palette = CARD_PALETTES[paletteIdx];
-  const isNew = glowAlpha > 0.05;
-  const isSpace = _cardTheme === "space";
+  const { x, y, rotation, scale, opacity, glowAlpha, sig, paletteIdx, faceIdx } = item;
+  const palette  = CARD_PALETTES[paletteIdx];
+  const isNew    = glowAlpha > 0.05;
+  const isSpace  = _cardTheme === "space";
+  const { outline, features, clip, asset } = getResolvedFace(faceIdx);
 
   ctx.save();
   ctx.globalAlpha = opacity;
@@ -20,123 +22,106 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
   ctx.rotate((rotation * Math.PI) / 180);
   ctx.scale(scale, scale);
 
-  const fontSize = sig.signature ? 20 : 24;
-  ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
-  const textW = ctx.measureText(sig.name).width;
-  const padX = 24;
-  const padY = 14;
-  const boxW = Math.max(textW + padX * 2, 130);
-  const sigH = sig.signature ? 38 : 0;
-  const boxH = fontSize + padY * 2 + sigH;
-
-  // Glow halo for new entries
+  // ── Glow halo (new entries only) ──────────────────────────────────────────
   if (isNew) {
     ctx.save();
-    ctx.globalAlpha = opacity * glowAlpha * 0.5;
-    ctx.shadowColor = palette.glow;
-    ctx.shadowBlur = 36;
-    ctx.fillStyle = `${palette.border}30`;
-    roundRect(ctx, -boxW / 2 - 6, -boxH / 2 - 6, boxW + 12, boxH + 12, 16);
-    ctx.fill();
+    ctx.globalAlpha = opacity * glowAlpha * 0.55;
+    ctx.shadowColor  = palette.glow;
+    ctx.shadowBlur   = 42;
+    ctx.strokeStyle  = palette.glow;
+    ctx.lineWidth    = 3.5;
+    ctx.stroke(outline);
+    ctx.shadowBlur  = 18;
+    ctx.lineWidth   = 1.8;
+    ctx.stroke(outline);
     ctx.restore();
   }
 
-  // Card background
-  const grad = ctx.createLinearGradient(-boxW / 2, -boxH / 2, boxW / 2, boxH / 2);
-  if (isSpace) {
-    grad.addColorStop(0, "rgba(10,16,40,0.92)");
-    grad.addColorStop(1, "rgba(4,8,25,0.96)");
-  } else {
-    grad.addColorStop(0, "rgba(255,255,255,0.97)");
-    grad.addColorStop(1, `${palette.border}42`);
+  // ── Drawn handwritten signature clipped to signature region ───────────────
+  if (sig.signature) {
+    ctx.save();
+    ctx.clip(clip);
+    drawSignatureImage(ctx, sig.signature, asset, isSpace);
+    ctx.restore();
   }
-  ctx.shadowColor = isNew ? palette.shadow : (isSpace ? "rgba(0,0,0,0.5)" : `${palette.shadow}`);
-  ctx.shadowBlur = isNew ? 24 : 12;
-  ctx.fillStyle = grad;
-  roundRect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, 12);
-  ctx.fill();
 
-  // Border
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = palette.border;
-  ctx.lineWidth = isNew ? 2.5 : 2;
-  roundRect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, 12);
-  ctx.stroke();
-
-  // Top accent bar
+  // ── Face outline (vector stroke) ──────────────────────────────────────────
   ctx.save();
-  ctx.globalAlpha = opacity * (isNew ? 1.0 : 0.6);
-  const accentGrad = ctx.createLinearGradient(-boxW / 2, 0, boxW / 2, 0);
-  accentGrad.addColorStop(0, "transparent");
-  accentGrad.addColorStop(0.5, palette.border);
-  accentGrad.addColorStop(1, "transparent");
-  ctx.strokeStyle = accentGrad;
-  ctx.lineWidth = isNew ? 2.5 : 2;
-  ctx.beginPath();
-  ctx.moveTo(-boxW / 2 + 12, -boxH / 2 + 1);
-  ctx.lineTo(boxW / 2 - 12, -boxH / 2 + 1);
-  ctx.stroke();
+  if (isNew) {
+    ctx.shadowColor = palette.shadow;
+    ctx.shadowBlur  = 16;
+    ctx.strokeStyle = isSpace ? palette.glow : palette.border;
+    ctx.lineWidth   = 1.8;
+  } else {
+    ctx.shadowColor = isSpace ? "rgba(160,200,255,0.25)" : palette.shadow;
+    ctx.shadowBlur  = 5;
+    ctx.strokeStyle = isSpace
+      ? "rgba(200,220,255,0.48)"
+      : `${palette.border}cc`;
+    ctx.lineWidth = 1.1;
+  }
+  ctx.stroke(outline);
   ctx.restore();
 
-  // Name text — palette color on sky cards (bright + distinct), light on space cards
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = isSpace ? palette.lightText : palette.border;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(sig.name, 0, sig.signature ? -sigH / 2 : 0);
-
-  if (sig.signature) {
-    drawSignatureImage(ctx, sig.signature, 0, fontSize / 2 + padY / 2, boxW - 20, sigH - 4, isSpace);
+  // ── Optional feature paths (glasses, beard) ───────────────────────────────
+  for (const feat of features) {
+    ctx.save();
+    ctx.strokeStyle = isSpace
+      ? "rgba(200,220,255,0.38)"
+      : `${palette.border}99`;
+    ctx.lineWidth   = 0.9;
+    ctx.shadowBlur  = 0;
+    ctx.stroke(feat);
+    ctx.restore();
   }
+
+  // ── Name below face ───────────────────────────────────────────────────────
+  ctx.font         = `700 14px ${FONT_STACK}`;
+  ctx.textAlign    = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowBlur   = 0;
+
+  if (isSpace) {
+    ctx.shadowColor = palette.glow;
+    ctx.shadowBlur  = 8;
+    ctx.fillStyle   = palette.lightText;
+  } else {
+    ctx.fillStyle = palette.border;
+  }
+  ctx.fillText(sig.name, 0, FACE_ASSET_NAME_Y);
 
   ctx.restore();
 }
 
+// ─── Signature image renderer ─────────────────────────────────────────────────
+
 function drawSignatureImage(
   ctx: CanvasRenderingContext2D,
   b64: string,
-  cx: number,
-  cy: number,
-  maxW: number,
-  maxH: number,
+  asset: FacePathAsset,
   invert: boolean,
 ): void {
   const img = _imgCache.get(b64);
   if (img && img.complete && img.naturalWidth > 0) {
+    const r   = asset.signatureRegion;
+    const maxW = r.width;
+    const maxH = r.height;
     const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
-    const w = img.naturalWidth * ratio;
+    const w = img.naturalWidth  * ratio;
     const h = img.naturalHeight * ratio;
+    const cx = r.x + r.width  / 2;
+    const cy = r.y + r.height / 2;
     ctx.save();
-    ctx.globalAlpha *= 0.9;
-    if (invert) {
-      // Space theme: draw sig in light color using composite trick
-      ctx.filter = "invert(1) brightness(1.3)";
-    }
-    ctx.drawImage(img, cx - w / 2, cy, w, h);
+    ctx.globalAlpha *= 0.88;
+    if (invert) ctx.filter = "invert(1) brightness(1.3)";
+    ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
     ctx.restore();
   } else if (!img) {
     const el = new Image();
     el.src = b64;
     _imgCache.set(b64, el);
-    // Evict oldest entry when cache exceeds 300 items
-    if (_imgCache.size > 300) {
-      _imgCache.delete(_imgCache.keys().next().value!);
-    }
+    if (_imgCache.size > 300) _imgCache.delete(_imgCache.keys().next().value!);
   }
 }
 
 const _imgCache = new Map<string, HTMLImageElement>();
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}

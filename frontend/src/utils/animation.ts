@@ -1,4 +1,5 @@
 import { Signature } from "../types";
+import { FACE_ASSET_HW, FACE_ASSET_HH, FACE_ASSET_NAME_Y, FACE_COUNT, faceIdxForId } from "../assets/facePaths";
 
 export const CARD_PALETTES = [
   { border: "#e63946", darkText: "#1a0005", lightText: "#ffe4e6", glow: "#ff4d5a", shadow: "rgba(230,57,70,0.55)" },
@@ -32,35 +33,52 @@ export interface FloatingItem {
   entryProgress: number;
   age: number;
   sineOffset: number;
+  entryStartX: number;
+  entryStartY: number;
+  targetX: number;
+  targetY: number;
+  faceIdx: number;
 }
 
 const FLOAT_SPEED_MIN = 0.12;
 const FLOAT_SPEED_MAX = 0.38;
-const ENTRY_DURATION = 0.7;
-const GLOW_DURATION = 3.0;
+const ENTRY_DURATION  = 0.7;
+const GLOW_DURATION   = 3.0;
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
 export function createItem(sig: Signature, canvasW: number, canvasH: number): FloatingItem {
+  const targetX = rand(canvasW * 0.12, canvasW * 0.88);
+  const targetY = rand(canvasH * 0.08, canvasH * 0.72);
+
+  const entryStartX = canvasW / 2 + rand(-60, 60);
+  const entryStartY = canvasH * 0.85;
+
   const angle = rand(0, Math.PI * 2);
   const speed = rand(FLOAT_SPEED_MIN, FLOAT_SPEED_MAX);
+
   return {
     sig,
-    paletteIdx: paletteForId(sig.id),
-    x: rand(100, canvasW - 100),
-    y: rand(100, canvasH - 100),
-    vx: Math.cos(angle) * speed,
-    vy: Math.sin(angle) * speed,
-    rotation: rand(-6, 6),
+    paletteIdx:    paletteForId(sig.id),
+    x:             entryStartX,
+    y:             entryStartY,
+    entryStartX,
+    entryStartY,
+    targetX,
+    targetY,
+    vx:            Math.cos(angle) * speed,
+    vy:            Math.sin(angle) * speed,
+    rotation:      rand(-6, 6),
     rotationSpeed: rand(-0.035, 0.035),
-    scale: 1.8,
-    opacity: 1,
-    glowAlpha: 1,
+    scale:         1.8,
+    opacity:       1,
+    glowAlpha:     1,
     entryProgress: 0,
-    age: 0,
-    sineOffset: rand(0, Math.PI * 2),
+    age:           0,
+    sineOffset:    rand(0, Math.PI * 2),
+    faceIdx:       faceIdxForId(sig.id),  // deterministic per signature
   };
 }
 
@@ -76,31 +94,30 @@ export function tickItems(
 
     if (item.entryProgress < 1) {
       item.entryProgress = Math.min(1, item.entryProgress + dt / ENTRY_DURATION);
+      const t = easeOut(item.entryProgress);
+      item.x = lerp(item.entryStartX, item.targetX, t);
+      item.y = lerp(item.entryStartY, item.targetY, t);
+    } else {
+      const sineX = Math.sin(item.age * 0.35 + item.sineOffset) * 0.28;
+      item.x += (item.vx + sineX) * dt * 60;
+      item.y += item.vy * dt * 60;
+
+      const pad = 24;
+      if (item.x < pad && item.vx < 0)          item.vx *= -1;
+      if (item.x > canvasW - pad && item.vx > 0) item.vx *= -1;
+      if (item.y < pad && item.vy < 0)           item.vy *= -1;
+      if (item.y > canvasH - pad && item.vy > 0) item.vy *= -1;
     }
 
     item.glowAlpha = Math.max(0, 1 - item.age / GLOW_DURATION);
-
-    const sineX = Math.sin(item.age * 0.35 + item.sineOffset) * 0.28;
-    item.x += (item.vx + sineX) * dt * 60;
-    item.y += item.vy * dt * 60;
-
-    const pad = 70;
-    if (item.x < pad && item.vx < 0) item.vx *= -1;
-    if (item.x > canvasW - pad && item.vx > 0) item.vx *= -1;
-    if (item.y < pad && item.vy < 0) item.vy *= -1;
-    if (item.y > canvasH - pad && item.vy > 0) item.vy *= -1;
-
     item.rotation += item.rotationSpeed;
 
-    // Newest item (highest idx) = biggest + most opaque
-    const newRank = totalCount > 1 ? idx / (totalCount - 1) : 1.0;
-    item.opacity = lerp(0.3, 1.0, newRank);
-    const targetScale = lerp(0.6, 1.35, newRank);
-    if (item.entryProgress < 1) {
-      item.scale = lerp(1.8, targetScale, easeOut(item.entryProgress));
-    } else {
-      item.scale = targetScale;
-    }
+    const newRank    = totalCount > 1 ? idx / (totalCount - 1) : 1.0;
+    item.opacity     = lerp(0.55, 1.0, newRank);
+    const targetScale = lerp(0.75, 1.35, newRank);
+    item.scale = item.entryProgress < 1
+      ? lerp(1.8, targetScale, easeOut(item.entryProgress))
+      : targetScale;
   });
 
   separateItems(items);
@@ -116,15 +133,13 @@ function separateItems(items: FloatingItem[]): void {
       const overlapX = estimateHalfW(a) + estimateHalfW(b) - Math.abs(dx);
       const overlapY = estimateHalfH(a) + estimateHalfH(b) - Math.abs(dy);
       if (overlapX > 0 && overlapY > 0) {
-        const push = 0.25;
+        const push = 0.08;
         if (overlapX < overlapY) {
           const d = overlapX * push * (dx >= 0 ? 1 : -1);
-          a.x -= d;
-          b.x += d;
+          a.x -= d; b.x += d;
         } else {
           const d = overlapY * push * (dy >= 0 ? 1 : -1);
-          a.y -= d;
-          b.y += d;
+          a.y -= d; b.y += d;
         }
       }
     }
@@ -132,12 +147,15 @@ function separateItems(items: FloatingItem[]): void {
 }
 
 function estimateHalfW(item: FloatingItem): number {
-  return (Math.max(item.sig.name.length * 16, 120) / 2 + 36) * item.scale;
+  return FACE_ASSET_HW * item.scale * 1.1;
 }
 
 function estimateHalfH(item: FloatingItem): number {
-  return ((item.sig.signature ? 84 : 52) / 2 + 14) * item.scale;
+  return Math.max(FACE_ASSET_HH, FACE_ASSET_NAME_Y + 10) * item.scale * 1.05;
 }
+
+// suppress unused-import warning — FACE_COUNT is used to size the pool
+void FACE_COUNT;
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * Math.min(1, Math.max(0, t));

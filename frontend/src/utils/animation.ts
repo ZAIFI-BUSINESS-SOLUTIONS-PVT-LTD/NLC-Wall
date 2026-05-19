@@ -91,11 +91,17 @@ export function tickItems(
     if (item.y > canvasH - pad && item.vy > 0) item.vy *= -1;
 
     item.rotation += item.rotationSpeed;
+    // Bounce rotation back within ±20° so names never appear upside-down
+    if (item.rotation > 20) { item.rotation = 20; item.rotationSpeed = -Math.abs(item.rotationSpeed); }
+    if (item.rotation < -20) { item.rotation = -20; item.rotationSpeed = Math.abs(item.rotationSpeed); }
 
     // Newest item (highest idx) = biggest + most opaque
     const newRank = totalCount > 1 ? idx / (totalCount - 1) : 1.0;
-    item.opacity = lerp(0.3, 1.0, newRank);
-    const targetScale = lerp(0.6, 1.35, newRank);
+    // Minimum opacity scales with count so cards only fade when the wall is crowded
+    const minOpacity = totalCount <= 5 ? 0.78 : totalCount <= 15 ? 0.62 : 0.50;
+    item.opacity = lerp(minOpacity, 1.0, newRank);
+    const minScale = totalCount <= 5 ? 1.05 : totalCount <= 15 ? 0.88 : 0.75;
+    const targetScale = lerp(minScale, 1.35, newRank);
     if (item.entryProgress < 1) {
       item.scale = lerp(1.8, targetScale, easeOut(item.entryProgress));
     } else {

@@ -3,6 +3,7 @@
 
 Fully offline, local-network interactive digital signature wall.
 Visitors sign on tablets → signatures appear live on the big display screen in real-time.
+Designed for high-throughput multi-table events — handles up to **80+ signatures per minute** seamlessly.
 
 ---
 
@@ -37,7 +38,7 @@ Look for **IPv4 Address** under your active Wi-Fi adapter (e.g. `192.168.1.10`).
 
 ## Multi-Tablet Setup
 
-For the full 4–5 tablet deployment procedure (network setup, kiosk mode, pre-event checklist, troubleshooting), see [TABLET_DEPLOYMENT.md](TABLET_DEPLOYMENT.md).
+For the full deployment procedure (network setup, kiosk mode, pre-event checklist, troubleshooting), see [TABLET_DEPLOYMENT.md](TABLET_DEPLOYMENT.md).
 
 ---
 
@@ -88,28 +89,52 @@ Frontend dev server runs on `http://localhost:5173` and proxies API/WS to `:8000
 [ Tablet 2 ] ─┤
 [ Tablet 3 ] ─┼──► POST /submit ──► [ FastAPI :8000 ] ──► WS broadcast ──► [ Display TV ]
 [ Tablet 4 ] ─┤                           │
-[ Tablet 5 ] ─┘                    signatures/YYYY-MM-DD/
+[ Tablet N ] ─┘                    signatures/YYYY-MM-DD/
                                     (auto-saved PNGs)
 ```
 
-- **Backend**: FastAPI + WebSockets, in-memory store + auto disk persistence
-- **Frontend**: React + Vite + TypeScript, HTML5 Canvas animation
+- **Backend**: FastAPI + WebSockets, in-memory store (cap 500) + auto disk persistence
+- **Frontend**: React + Vite + TypeScript, HTML5 Canvas 60fps animation
 - **Zero internet dependency** — runs entirely on local Wi-Fi
 
 ---
 
 ## Moderation
 
-- Duplicate name within 60s → rejected
-- Rate limit: 5 submissions per IP per minute
-- Profanity blocklist — edit `backend/moderation.py` → `PROFANITY_BLOCKLIST`
+| Rule | Value | Notes |
+|------|-------|-------|
+| Rate limit | **15 submissions / IP / minute** | Allows burst from a busy tablet |
+| Duplicate name | **8 second** window | Prevents double-taps; same name from a different table is accepted after 8s |
+| Profanity | blocklist | Edit `backend/moderation.py` → `PROFANITY_BLOCKLIST` |
 
 ---
 
 ## Display Wall
 
-- Up to 500 floating signatures on canvas (GPU-friendly)
-- 60fps animation: float, drift, gentle rotation
-- New entries: scale-in + cyan glow pulse for 2 seconds
-- Aging: older signatures fade and shrink into background
-- Two themes: **sky** (day) and **space** (night) — switchable from `/admin`
+### Floating card behaviour
+
+Cards recede into the background by **count**, not by time:
+
+| Position from newest | Size | Opacity |
+|---|---|---|
+| 1 – 10 (front row) | 100% — all identical | 100% |
+| 11 – 32 (recession zone) | gradually shrinks to 50% | 92% → 12% |
+| 33+ | evicted from canvas | — |
+
+- The newest arrival always enters with a scale-in zoom + glow pulse
+- Scale transitions are smoothly animated (~0.4 s) so displacement never looks jarring
+- Canvas is capped at **32 live items** — the renderer stays smooth even at 80 signs/min
+
+### Themes
+
+Seven themes switchable live from `/admin` with no page reload:
+
+| Theme | Feel |
+|-------|------|
+| ☁ Sky | Bright day sky with drifting clouds |
+| 🌌 Space | Deep space with twinkling stars |
+| 🌠 Aurora | Dark sky with animated aurora bands |
+| 🌊 Ocean | Deep ocean with rising bubbles |
+| ⚡ Neon | Black with neon grid and streaks |
+| 🌿 Forest | Dark forest with falling leaves & fireflies |
+| 🌅 Sunset | Warm gradient with rising embers |

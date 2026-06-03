@@ -14,9 +14,9 @@ _ip_timestamps: Dict[str, List[float]] = defaultdict(list)
 _recent_names: List[Tuple[str, float]] = []
 _lock = threading.Lock()
 
-RATE_LIMIT_COUNT = 5
+RATE_LIMIT_COUNT = 15       # per IP per minute — handles burst from one tablet
 RATE_LIMIT_WINDOW = 60.0   # seconds
-DUPLICATE_WINDOW = 60.0    # seconds
+DUPLICATE_WINDOW = 8.0     # seconds — short enough that same name from a second person is fine
 
 
 def _cleanup(now: float) -> None:

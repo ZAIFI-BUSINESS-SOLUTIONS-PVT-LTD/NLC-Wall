@@ -5,7 +5,7 @@ export interface Signature {
   timestamp: number; // unix ms
 }
 
-export type DisplayTheme = "sky" | "space";
+export type DisplayTheme = "sky" | "space" | "aurora" | "ocean" | "neon" | "forest" | "sunset";
 
 export type WSEvent =
   | { event: "init"; data: Signature[] }

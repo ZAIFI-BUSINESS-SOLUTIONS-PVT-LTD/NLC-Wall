@@ -37,7 +37,6 @@ export interface FloatingItem {
 const FLOAT_SPEED_MIN = 0.12;
 const FLOAT_SPEED_MAX = 0.38;
 const ENTRY_DURATION = 0.7;
-const GLOW_DURATION = 3.0;
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -78,7 +77,11 @@ export function tickItems(
       item.entryProgress = Math.min(1, item.entryProgress + dt / ENTRY_DURATION);
     }
 
-    item.glowAlpha = Math.max(0, 1 - item.age / GLOW_DURATION);
+    // reverseRank: 0 = newest item, grows as item gets older
+    const reverseRank = totalCount - 1 - idx;
+
+    // Glow only for the newest item
+    item.glowAlpha = reverseRank === 0 ? 1.0 : 0;
 
     const sineX = Math.sin(item.age * 0.35 + item.sineOffset) * 0.28;
     item.x += (item.vx + sineX) * dt * 60;
@@ -95,17 +98,29 @@ export function tickItems(
     if (item.rotation > 20) { item.rotation = 20; item.rotationSpeed = -Math.abs(item.rotationSpeed); }
     if (item.rotation < -20) { item.rotation = -20; item.rotationSpeed = Math.abs(item.rotationSpeed); }
 
-    // Newest item (highest idx) = biggest + most opaque
-    const newRank = totalCount > 1 ? idx / (totalCount - 1) : 1.0;
-    // Minimum opacity scales with count so cards only fade when the wall is crowded
-    const minOpacity = totalCount <= 5 ? 0.78 : totalCount <= 15 ? 0.62 : 0.50;
-    item.opacity = lerp(minOpacity, 1.0, newRank);
-    const minScale = totalCount <= 5 ? 1.05 : totalCount <= 15 ? 0.88 : 0.75;
-    const targetScale = lerp(minScale, 1.35, newRank);
+    // Newest 10 float at the same full size.
+    // Once count exceeds 10, oldest starts shrinking (receding into distance).
+    // Fade zone spans 22 more slots (rank 10 → 32) to stay smooth at high throughput.
+    const FRONT_COUNT = 10;
+    let opacity: number;
+    let targetScale: number;
+
+    if (reverseRank < FRONT_COUNT) {
+      opacity = 1.0;
+      targetScale = 1.35;
+    } else {
+      const t = Math.min(1, (reverseRank - FRONT_COUNT) / 22);
+      opacity = lerp(0.92, 0.12, t);
+      targetScale = lerp(1.18, 0.50, t);
+    }
+
+    item.opacity = opacity;
+
     if (item.entryProgress < 1) {
       item.scale = lerp(1.8, targetScale, easeOut(item.entryProgress));
     } else {
-      item.scale = targetScale;
+      // Smooth scale transition when displaced by a new arrival
+      item.scale += (targetScale - item.scale) * Math.min(1, dt * 2.5);
     }
   });
 

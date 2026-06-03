@@ -2,6 +2,16 @@ import React, { useState, useEffect } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { DisplayTheme } from "../types";
 
+const DISPLAY_THEMES: { id: DisplayTheme; label: string; emoji: string }[] = [
+  { id: "sky",    label: "Sky",    emoji: "🌤" },
+  { id: "space",  label: "Space",  emoji: "🌌" },
+  { id: "aurora", label: "Aurora", emoji: "🌠" },
+  { id: "ocean",  label: "Ocean",  emoji: "🌊" },
+  { id: "neon",   label: "Neon",   emoji: "⚡" },
+  { id: "forest", label: "Forest", emoji: "🌿" },
+  { id: "sunset", label: "Sunset", emoji: "🌅" },
+];
+
 interface Stats {
   count: number;
   status: string;
@@ -242,22 +252,21 @@ export function AdminPage(): React.ReactElement {
 
           <div className="admin-row">
             <div className="admin-row-label">
-              <span className="admin-row-icon">{displayTheme === "sky" ? "☁️" : "🌌"}</span>
+              <span className="admin-row-icon">
+                {DISPLAY_THEMES.find((t) => t.id === displayTheme)?.emoji ?? "🌤"}
+              </span>
               Display Wall Theme
             </div>
-            <div className="theme-toggle-group">
-              <button
-                className={`theme-btn${displayTheme === "sky" ? " active" : ""}`}
-                onClick={() => handleSetDisplayTheme("sky")}
-              >
-                ☁ Sky
-              </button>
-              <button
-                className={`theme-btn${displayTheme === "space" ? " active" : ""}`}
-                onClick={() => handleSetDisplayTheme("space")}
-              >
-                🌌 Space
-              </button>
+            <div className="theme-toggle-group theme-toggle-wrap">
+              {DISPLAY_THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  className={`theme-btn${displayTheme === t.id ? " active" : ""}`}
+                  onClick={() => handleSetDisplayTheme(t.id)}
+                >
+                  {t.emoji} {t.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>

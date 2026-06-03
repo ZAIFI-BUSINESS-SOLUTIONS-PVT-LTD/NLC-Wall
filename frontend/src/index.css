@@ -549,6 +549,11 @@ html, body, #root {
   gap: 8px;
 }
 
+.theme-toggle-wrap {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .theme-btn {
   padding: 8px 20px;
   border-radius: 8px;

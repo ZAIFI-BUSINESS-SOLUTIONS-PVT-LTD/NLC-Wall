@@ -89,8 +89,9 @@ async def get_display_theme() -> JSONResponse:
 @app.post("/admin/display-theme")
 async def set_display_theme(body: ThemeBody) -> JSONResponse:
     global _display_theme
-    if body.theme not in ("sky", "space"):
-        raise HTTPException(status_code=400, detail="Invalid theme. Use 'sky' or 'space'.")
+    VALID_THEMES = {"sky", "space", "aurora", "ocean", "neon", "forest", "sunset"}
+    if body.theme not in VALID_THEMES:
+        raise HTTPException(status_code=400, detail=f"Invalid theme. Use one of: {', '.join(sorted(VALID_THEMES))}")
     _display_theme = body.theme
     await manager.broadcast({"event": "display_theme", "theme": _display_theme})
     return JSONResponse({"theme": _display_theme})

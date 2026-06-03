@@ -39,10 +39,10 @@ export function DisplayPage(): React.ReactElement {
 
   useWebSocket(handleWS);
 
-  const isSpace = displayTheme === "space";
+  const isDark = displayTheme !== "sky";
 
   return (
-    <div className={`display-page${isSpace ? " display-page--space" : ""}`}>
+    <div className={`display-page${isDark ? " display-page--space" : ""}`}>
       <FloatingWall signatures={signatures} newSig={newSig} displayTheme={displayTheme} />
 
       {/* Top-left HUD */}

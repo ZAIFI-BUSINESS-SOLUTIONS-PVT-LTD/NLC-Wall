@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback } from "react";
 import { Signature, DisplayTheme } from "../types";
 import { FloatingItem, createItem, tickItems } from "../utils/animation";
 import { drawItem, setCardTheme } from "../utils/canvas";
+import { THEME_CONFIGS, Particle } from "../utils/themes";
 
 interface Props {
   signatures: Signature[];
@@ -26,11 +27,8 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
   const bgHueRef = useRef<number>(220);
   const themeRef = useRef<DisplayTheme>(displayTheme);
   const cloudsRef = useRef<CloudDef[]>([]);
-
-  useEffect(() => {
-    themeRef.current = displayTheme;
-    setCardTheme(displayTheme);
-  }, [displayTheme]);
+  const particlesRef = useRef<Particle[]>([]);
+  const tickRef = useRef<number>(0);
 
   const initClouds = useCallback((w: number, h: number) => {
     cloudsRef.current = Array.from({ length: 11 }, (_, i) => {
@@ -45,6 +43,20 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
       };
     });
   }, []);
+
+  // Sync theme ref and reinit particles when theme changes
+  useEffect(() => {
+    themeRef.current = displayTheme;
+    setCardTheme(displayTheme);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (displayTheme === "sky") {
+      initClouds(canvas.width, canvas.height);
+    } else {
+      cloudsRef.current = [];
+    }
+    particlesRef.current = THEME_CONFIGS[displayTheme].initParticles(canvas.width, canvas.height);
+  }, [displayTheme, initClouds]);
 
   // Sync items with signatures prop
   useEffect(() => {
@@ -75,7 +87,10 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
     if (!canvas) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    initClouds(canvas.width, canvas.height);
+    if (themeRef.current === "sky") {
+      initClouds(canvas.width, canvas.height);
+    }
+    particlesRef.current = THEME_CONFIGS[themeRef.current].initParticles(canvas.width, canvas.height);
   }, [initClouds]);
 
   useEffect(() => {
@@ -93,16 +108,20 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
       const dt = lastTsRef.current ? Math.min((ts - lastTsRef.current) / 1000, 0.05) : 0.016;
       lastTsRef.current = ts;
       bgHueRef.current = (bgHueRef.current + dt * 1.5) % 360;
+      tickRef.current += dt;
 
       const W = canvas.width;
       const H = canvas.height;
       const theme = themeRef.current;
+      const tick = tickRef.current;
 
+      // Draw background
+      drawThemeBg(ctx, W, H, theme, bgHueRef.current, tick);
+
+      // Draw sky clouds inline (special case)
       if (theme === "sky") {
-        drawSkyBg(ctx, W, H);
         for (const cloud of cloudsRef.current) {
           cloud.x += cloud.speed * dt;
-          // Reset off-screen left and fade in instead of teleporting at full alpha
           if (cloud.x > W + cloud.size * 2) {
             cloud.x = -cloud.size * 2;
             cloud.alpha = 0;
@@ -112,10 +131,18 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
           }
           drawCloud(ctx, cloud.x, cloud.y, cloud.size, cloud.alpha);
         }
-      } else {
-        drawSpaceBg(ctx, W, H, bgHueRef.current);
       }
 
+      // Update and draw particles
+      updateAndDrawParticles(ctx, particlesRef.current, dt, W, H, theme, tick);
+
+      // Evict oldest items beyond cap so canvas stays performant at high throughput
+      const CANVAS_CAP = 32;
+      if (itemsRef.current.length > CANVAS_CAP) {
+        itemsRef.current.splice(0, itemsRef.current.length - CANVAS_CAP);
+      }
+
+      // Draw floating cards
       const items = itemsRef.current;
       tickItems(items, dt, W, H, items.length);
       for (const item of items) drawItem(ctx, item);
@@ -130,7 +157,42 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
   return <canvas ref={canvasRef} className="display-canvas" />;
 }
 
-// ─── Sky ────────────────────────────────────────────────────────────────────
+// ─── Background dispatch ─────────────────────────────────────────────────────
+
+function drawThemeBg(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  theme: DisplayTheme,
+  hue: number,
+  tick: number,
+): void {
+  switch (theme) {
+    case "sky":
+      drawSkyBg(ctx, W, H);
+      break;
+    case "space":
+      drawSpaceBg(ctx, W, H, hue);
+      break;
+    case "aurora":
+      drawAuroraBg(ctx, W, H, tick);
+      break;
+    case "ocean":
+      drawOceanBg(ctx, W, H, tick);
+      break;
+    case "neon":
+      drawNeonBg(ctx, W, H);
+      break;
+    case "forest":
+      drawForestBg(ctx, W, H);
+      break;
+    case "sunset":
+      drawSunsetBg(ctx, W, H, tick);
+      break;
+  }
+}
+
+// ─── Sky ─────────────────────────────────────────────────────────────────────
 
 function drawSkyBg(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const grad = ctx.createLinearGradient(0, 0, 0, h);
@@ -148,22 +210,19 @@ function drawCloud(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: 
 
   const r = size * 0.42;
 
-  // Shadow pass — draw filled shape slightly larger with blur
   ctx.shadowColor = "rgba(100,170,230,0.38)";
   ctx.shadowBlur = 28;
   ctx.fillStyle = "rgba(255,255,255,0.93)";
 
-  // Build one compound path of overlapping circles = natural cloud silhouette
   ctx.beginPath();
-  ctx.arc(cx,            cy + r * 0.18, r * 0.88, 0, Math.PI * 2);   // main body
-  ctx.arc(cx - r * 0.80, cy + r * 0.28, r * 0.60, 0, Math.PI * 2);   // left lobe
-  ctx.arc(cx + r * 0.80, cy + r * 0.28, r * 0.62, 0, Math.PI * 2);   // right lobe
-  ctx.arc(cx - r * 0.40, cy - r * 0.28, r * 0.58, 0, Math.PI * 2);   // upper-left bump
-  ctx.arc(cx + r * 0.38, cy - r * 0.30, r * 0.55, 0, Math.PI * 2);   // upper-right bump
-  ctx.arc(cx,            cy - r * 0.65, r * 0.48, 0, Math.PI * 2);    // top peak
+  ctx.arc(cx,            cy + r * 0.18, r * 0.88, 0, Math.PI * 2); // main body
+  ctx.arc(cx - r * 0.80, cy + r * 0.28, r * 0.60, 0, Math.PI * 2); // left lobe
+  ctx.arc(cx + r * 0.80, cy + r * 0.28, r * 0.62, 0, Math.PI * 2); // right lobe
+  ctx.arc(cx - r * 0.40, cy - r * 0.28, r * 0.58, 0, Math.PI * 2); // upper-left bump
+  ctx.arc(cx + r * 0.38, cy - r * 0.30, r * 0.55, 0, Math.PI * 2); // upper-right bump
+  ctx.arc(cx,            cy - r * 0.65, r * 0.48, 0, Math.PI * 2); // top peak
   ctx.fill();
 
-  // Bright highlight on upper-left to give 3-D fluffiness
   ctx.shadowBlur = 0;
   ctx.globalAlpha = alpha * 0.45;
   ctx.fillStyle = "rgba(255,255,255,0.95)";
@@ -174,7 +233,7 @@ function drawCloud(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: 
   ctx.restore();
 }
 
-// ─── Space ──────────────────────────────────────────────────────────────────
+// ─── Space ────────────────────────────────────────────────────────────────────
 
 const STARS = Array.from({ length: 200 }, () => ({
   x: Math.random(),
@@ -214,4 +273,335 @@ function drawSpaceBg(ctx: CanvasRenderingContext2D, w: number, h: number, hue: n
     ctx.fill();
   }
   ctx.restore();
+}
+
+// ─── Aurora ───────────────────────────────────────────────────────────────────
+
+function drawAuroraBg(ctx: CanvasRenderingContext2D, w: number, h: number, tick: number): void {
+  ctx.fillStyle = "#010d12";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < 4; i++) {
+    const centerY = h * (0.25 + i * 0.15);
+    const phase = tick * 0.8 + i * 1.2;
+    const amplitude = h * 0.06;
+    const bandH = 80;
+    const hue = (160 + i * 40 + tick * 20) % 360;
+
+    const grad = ctx.createLinearGradient(0, centerY - bandH, 0, centerY + bandH);
+    grad.addColorStop(0, "transparent");
+    grad.addColorStop(0.5, `hsla(${hue}, 80%, 55%, 0.15)`);
+    grad.addColorStop(1, "transparent");
+
+    // Draw wavy band using horizontal strips
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(0, centerY - bandH);
+    for (let x = 0; x <= w; x += 8) {
+      const yOff = Math.sin(x * 0.01 + phase) * amplitude;
+      ctx.lineTo(x, centerY - bandH + yOff);
+    }
+    for (let x = w; x >= 0; x -= 8) {
+      const yOff = Math.sin(x * 0.01 + phase) * amplitude;
+      ctx.lineTo(x, centerY + bandH + yOff);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.restore();
+}
+
+// ─── Ocean ────────────────────────────────────────────────────────────────────
+
+function drawOceanBg(ctx: CanvasRenderingContext2D, w: number, h: number, tick: number): void {
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#000d1a");
+  grad.addColorStop(0.5, "#00204a");
+  grad.addColorStop(1, "#003366");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  ctx.fillStyle = "#00aaff";
+  for (let i = 0; i < 10; i++) {
+    // Seeded pseudo-random positions via index
+    const cx = ((i * 137 + 50) % w);
+    const cy = ((i * 211 + 80) % h);
+    const scaleP = 0.8 + 0.2 * Math.sin(tick * 0.5 + i);
+    const rx = (40 + (i * 53) % 60) * scaleP;
+    const ry = (20 + (i * 37) % 30) * scaleP;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, (i * 0.5) % Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ─── Neon ─────────────────────────────────────────────────────────────────────
+
+function drawNeonBg(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,255,180,0.06)";
+  ctx.lineWidth = 1;
+
+  // Perspective grid — 12 lines from bottom-left/right converging to vanishing point
+  const vx = w / 2;
+  const vy = h * 0.1;
+  const segments = 12;
+  for (let i = 0; i <= segments; i++) {
+    const bx = (w / segments) * i;
+    ctx.beginPath();
+    ctx.moveTo(vx, vy);
+    ctx.lineTo(bx, h);
+    ctx.stroke();
+  }
+
+  // 3 vertical lines
+  for (let i = 1; i <= 3; i++) {
+    const x = (w / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ─── Forest ───────────────────────────────────────────────────────────────────
+
+function drawForestBg(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#020d04");
+  grad.addColorStop(0.5, "#0a1f0a");
+  grad.addColorStop(1, "#041208");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Ground fog
+  const fogGrad = ctx.createLinearGradient(0, h * 0.8, 0, h);
+  fogGrad.addColorStop(0, "rgba(150,200,150,0.07)");
+  fogGrad.addColorStop(1, "transparent");
+  ctx.fillStyle = fogGrad;
+  ctx.fillRect(0, h * 0.8, w, h * 0.2);
+}
+
+// ─── Sunset ───────────────────────────────────────────────────────────────────
+
+function drawSunsetBg(ctx: CanvasRenderingContext2D, w: number, h: number, tick: number): void {
+  const s = Math.sin(tick * 0.3);
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#0a0015");
+  grad.addColorStop(0.35, `hsl(${330 + s * 5}, 60%, 35%)`);
+  grad.addColorStop(0.65, `hsl(${18 + s * 3}, 70%, 45%)`);
+  grad.addColorStop(1, "#f5a623");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+// ─── Particle update + draw ───────────────────────────────────────────────────
+
+function updateAndDrawParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[],
+  dt: number,
+  W: number,
+  H: number,
+  theme: DisplayTheme,
+  tick: number,
+): void {
+  if (particles.length === 0) return;
+
+  switch (theme) {
+    case "aurora":
+      updateAuroraParticles(ctx, particles, dt, W, H);
+      break;
+    case "ocean":
+      updateOceanParticles(ctx, particles, dt, W, H);
+      break;
+    case "neon":
+      updateNeonParticles(ctx, particles, dt, W, H, tick);
+      break;
+    case "forest":
+      updateForestParticles(ctx, particles, dt, W, H);
+      break;
+    case "sunset":
+      updateSunsetParticles(ctx, particles, dt, W, H);
+      break;
+    default:
+      break;
+  }
+}
+
+function updateAuroraParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[],
+  dt: number,
+  W: number,
+  H: number,
+): void {
+  for (const p of particles) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    // Wrap around edges
+    if (p.x < 0) p.x = W;
+    if (p.x > W) p.x = 0;
+    if (p.y < 0) p.y = H;
+    if (p.y > H) p.y = 0;
+    p.phase += dt * 1.5;
+
+    const a = p.alpha * (0.5 + 0.5 * Math.sin(p.phase));
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function updateOceanParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[],
+  dt: number,
+  W: number,
+  H: number,
+): void {
+  for (const p of particles) {
+    p.y += p.vy * dt;
+    p.x += p.vx * dt + Math.sin(p.phase) * 15 * dt;
+    p.phase += dt * 2;
+    // Reset when bubble exits top
+    if (p.y < -p.r * 2) {
+      p.y = H + p.r;
+      p.x = Math.random() * W;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function updateNeonParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[],
+  dt: number,
+  W: number,
+  _H: number,
+  tick: number,
+): void {
+  for (const p of particles) {
+    p.phase += dt * (3 + Math.random() * 2);
+    if (p.phase > Math.PI * 2) {
+      p.phase = 0;
+      p.y = Math.random() * _H;
+      p.x = Math.random() * W;
+    }
+
+    const a = Math.max(0, Math.sin(p.phase * 7 + tick)) * 0.4;
+    if (a <= 0) continue;
+
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 40 + p.phase * 80, 1);
+    ctx.restore();
+  }
+}
+
+function updateForestParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[],
+  dt: number,
+  W: number,
+  H: number,
+): void {
+  // First 35 = leaves, last 18 = fireflies
+  for (let idx = 0; idx < particles.length; idx++) {
+    const p = particles[idx];
+    if (idx < 35) {
+      // Leaf
+      p.y += p.vy * dt;
+      p.x += p.vx * dt + Math.sin(p.phase) * 20 * dt;
+      p.phase += dt;
+      if (p.rotation !== undefined && p.rotSpeed !== undefined) {
+        p.rotation += p.rotSpeed * dt * 60;
+      }
+      if (p.y > H + 10) {
+        p.y = -10;
+        p.x = Math.random() * W;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation ?? 0);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.r, p.r * 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      // Firefly
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      // Bounce off edges
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+      p.phase += dt * (0.5 + Math.random() * 0.3);
+      const a = Math.max(0, Math.sin(p.phase)) * 0.8;
+      if (a <= 0) continue;
+
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+function updateSunsetParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[],
+  dt: number,
+  W: number,
+  H: number,
+): void {
+  for (const p of particles) {
+    p.y += p.vy * dt; // rising (vy is negative)
+    p.x += p.vx * dt + Math.sin(p.phase) * 10 * dt;
+    p.phase += dt * 2;
+    const a = 0.3 + 0.7 * Math.abs(Math.sin(p.phase * 3));
+    if (p.y < -5) {
+      p.y = H + 5;
+      p.x = Math.random() * W;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = a * p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }

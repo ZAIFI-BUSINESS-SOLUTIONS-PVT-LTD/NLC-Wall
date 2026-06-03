@@ -6,8 +6,6 @@ from typing import Dict, List, Tuple
 # Configurable blocklist — extend as needed
 PROFANITY_BLOCKLIST = {
     "fuck", "shit", "bastard", "bitch", "asshole", "damn", "crap",
-    # Tamil transliteration common abuses (minimal set)
-    "otha", "thevdiya", "punda", "sunni", "koothi",
 }
 
 _ip_timestamps: Dict[str, List[float]] = defaultdict(list)

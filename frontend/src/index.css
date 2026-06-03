@@ -229,14 +229,34 @@ html, body, #root {
 
 .sig-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
-.sig-canvas {
+/* Face-shape drawing wrapper */
+.sig-face-wrap {
+  position: relative;
   width: 100%;
-  height: 200px;
+  height: 260px;
+}
+
+.sig-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   border-radius: 10px;
   border: 1.5px dashed var(--sig-canvas-border);
   background: var(--sig-canvas-bg);
   cursor: crosshair;
   touch-action: none;
+  display: block;
+}
+
+/* Guide canvas overlaid above drawing canvas — visual only, not exported */
+.sig-face-guide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  pointer-events: none;
   display: block;
 }
 
@@ -719,4 +739,168 @@ html, body, #root {
   color: var(--success-text);
   animation: fadeIn 0.3s ease;
   word-break: break-all;
+}
+
+/* ─── NAME INPUT — Tamil label secondary style ───────────────────────────── */
+
+.input-label-en {
+  font-weight: 400;
+  opacity: 0.7;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+
+/* ─── SIGNATURE CANVAS — optional badge ─────────────────────────────────── */
+
+/* Wraps the sig-label and the optional badge on one line */
+.sig-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sig-optional {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.75;
+  letter-spacing: 0.2px;
+}
+
+/* ─── SUCCESS OVERLAY — ceremony moment after form submit ────────────────── */
+
+/* Replaces form fields in .input-form on successful submit.
+   Goal: tell the signer exactly what happened and where to look.
+   Fullscreen within the card, animated checkmark, Tamil headline. */
+.success-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px 16px 40px;
+  text-align: center;
+  animation: fadeIn 0.4s ease;
+  min-height: 320px;
+}
+
+.success-check {
+  font-size: 64px;
+  line-height: 1;
+  color: var(--success-text);
+  animation: successPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.success-headline {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--success-text);
+  letter-spacing: -0.3px;
+}
+
+/* The submitted name, displayed prominently so they recognise it on screen */
+.success-name {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gold-light);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 14px;
+  padding: 12px 32px;
+  background: rgba(212, 175, 55, 0.07);
+  max-width: 100%;
+  word-break: break-word;
+  line-height: 1.25;
+}
+
+[data-theme="light"] .success-name {
+  color: #0055bb;
+  border-color: rgba(0, 85, 187, 0.3);
+  background: rgba(0, 85, 187, 0.06);
+}
+
+.success-sub {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+/* Pulsing call-to-action — draws their eyes toward the display wall */
+.success-look {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 10px 28px;
+  border-radius: 30px;
+  border: 1.5px solid var(--input-border);
+  margin-top: 4px;
+  animation: successPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes successPop {
+  from { transform: scale(0.3); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes successPulse {
+  0%,  100% { opacity: 1;   transform: scale(1);    }
+  50%        { opacity: 0.6; transform: scale(0.97); }
+}
+
+/* ─── DISPLAY WALL — toast (new signature announcement) ─────────────────── */
+
+/* Moved from bottom-right corner to top-center.
+   Old size: 15px, 10px padding — invisible from 3m away.
+   New size: 22px, 16px padding — readable from the back of the crowd. */
+.new-sig-toast {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 0;
+  width: fit-content;
+  margin: 0 auto;
+  background: rgba(0, 100, 210, 0.12);
+  border: 1.5px solid rgba(0, 100, 210, 0.45);
+  color: #003da5;
+  padding: 16px 48px;
+  border-radius: 40px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  /* 5s total: 0.4s in + 4.2s visible + 0.4s out — matches DisplayPage timer */
+  animation: toastIn 0.4s ease, toastOut 0.4s ease 4.6s forwards;
+}
+
+.display-page--space .new-sig-toast {
+  background: rgba(0, 212, 255, 0.10);
+  border-color: rgba(0, 212, 255, 0.45);
+  color: var(--cyan);
+}
+
+/* Overwrite previous toast keyframes — slide down from top on enter */
+@keyframes toastIn  { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-8px); } }
+
+/* ─── DISPLAY WALL — rolling counter label ───────────────────────────────── */
+
+.hud-count {
+  font-size: 13px;
+  color: #1a3060;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.display-page--space .hud-count { color: var(--text-muted); }
+
+.hud-count-num {
+  font-weight: 700;
+}
+
+.hud-count-label {
+  font-weight: 400;
+  font-size: 11px;
+  opacity: 0.85;
 }

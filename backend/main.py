@@ -1,5 +1,7 @@
 import uuid
 import time
+import base64
+import json
 import logging
 from pathlib import Path
 
@@ -15,17 +17,23 @@ logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import storage
+import database
 import moderation
-from models import SubmitRequest, Signature, SubmitResponse, HealthResponse, ThemeBody
+from models import (
+    SubmitRequest, Signature, SubmitResponse, HealthResponse,
+    ThemeBody, UpdateNameBody, PledgeBody, ChiefGuestConfigBody, ChiefGuestMarkBody,
+)
 from websocket import manager
 
 app = FastAPI(title="Live Sign Wall")
 
 _display_theme: str = "sky"
+_pledge_text: str = ""
+_cg_config: dict = {"enabled": False, "retention_mode": "forever", "retention_until": None}
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +41,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _load_server_config() -> None:
+    global _pledge_text, _cg_config
+    pledge = database.db_config_get("pledge_text")
+    if pledge is not None:
+        _pledge_text = pledge
+    cg = database.db_config_get("cg_config")
+    if cg:
+        try:
+            _cg_config = json.loads(cg)
+        except Exception:
+            pass
+
+
+_load_server_config()
 
 
 @app.post("/submit", response_model=SubmitResponse)
@@ -71,13 +95,24 @@ async def get_signatures() -> list:
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    return HealthResponse(status="ok", count=storage.count())
+    total = storage.count()
+    aud = storage.count_audience()
+    return HealthResponse(status="ok", count=total, audience_count=aud, cg_count=total - aud)
 
 
 @app.delete("/admin/signatures")
 async def admin_clear() -> JSONResponse:
-    storage.clear()
+    """Clears audience (non-chief-guest) signatures only."""
+    storage.clear_audience()
     await manager.broadcast({"event": "clear"})
+    return JSONResponse({"status": "cleared"})
+
+
+@app.delete("/admin/chief-guest-signatures")
+async def admin_clear_cg() -> JSONResponse:
+    """Clears chief-guest signatures only."""
+    storage.clear_chief_guests()
+    await manager.broadcast({"event": "clear_chief_guests"})
     return JSONResponse({"status": "cleared"})
 
 
@@ -97,6 +132,91 @@ async def set_display_theme(body: ThemeBody) -> JSONResponse:
     return JSONResponse({"theme": _display_theme})
 
 
+@app.get("/admin/pledge")
+async def get_pledge() -> JSONResponse:
+    return JSONResponse({"text": _pledge_text})
+
+
+@app.post("/admin/pledge")
+async def set_pledge(body: PledgeBody) -> JSONResponse:
+    global _pledge_text
+    _pledge_text = body.text
+    database.db_config_set("pledge_text", _pledge_text)
+    await manager.broadcast({"event": "pledge_update", "text": _pledge_text})
+    return JSONResponse({"text": _pledge_text})
+
+
+@app.get("/admin/chief-guest-config")
+async def get_cg_config() -> JSONResponse:
+    return JSONResponse(_cg_config)
+
+
+@app.post("/admin/chief-guest-config")
+async def set_cg_config(body: ChiefGuestConfigBody) -> JSONResponse:
+    global _cg_config
+    _cg_config = {
+        "enabled": body.enabled,
+        "retention_mode": body.retention_mode,
+        "retention_until": body.retention_until,
+    }
+    database.db_config_set("cg_config", json.dumps(_cg_config))
+    await manager.broadcast({"event": "cg_config", "config": _cg_config})
+    return JSONResponse(_cg_config)
+
+
+@app.get("/admin/db/signatures")
+async def admin_db_list(skip: int = 0, limit: int = 50) -> JSONResponse:
+    items = database.db_get_all_meta(skip=skip, limit=limit)
+    total = database.db_count()
+    return JSONResponse({"total": total, "items": items})
+
+
+@app.put("/admin/db/signatures/{sig_id}")
+async def admin_db_update(sig_id: str, body: UpdateNameBody) -> JSONResponse:
+    updated = storage.update_name(sig_id, body.name)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Signature not found")
+    return JSONResponse({"status": "updated"})
+
+
+@app.put("/admin/db/signatures/{sig_id}/chief-guest")
+async def admin_db_set_cg(sig_id: str, body: ChiefGuestMarkBody) -> JSONResponse:
+    updated = storage.set_chief_guest(sig_id, body.is_chief_guest)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Signature not found")
+    sig = database.db_get_by_id(sig_id)
+    if sig:
+        await manager.broadcast({"event": "update_signature", "data": sig.model_dump()})
+    return JSONResponse({"status": "updated"})
+
+
+@app.delete("/admin/db/signatures/{sig_id}")
+async def admin_db_delete(sig_id: str) -> JSONResponse:
+    removed = storage.remove(sig_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Signature not found")
+    await manager.broadcast({"event": "remove_signature", "id": sig_id})
+    return JSONResponse({"status": "deleted"})
+
+
+@app.get("/admin/db/signatures/{sig_id}/image")
+async def admin_db_image(sig_id: str) -> Response:
+    sig = database.db_get_by_id(sig_id)
+    if not sig or not sig.signature:
+        raise HTTPException(status_code=404, detail="Signature image not found")
+    try:
+        _header, b64_data = sig.signature.split(",", 1)
+        img_bytes = base64.b64decode(b64_data)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to decode signature image")
+    safe_name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in sig.name)
+    return Response(
+        content=img_bytes,
+        media_type="image/png",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}_{sig_id[:8]}.png"'},
+    )
+
+
 @app.post("/admin/save-images")
 async def admin_save_images() -> JSONResponse:
     """Re-saves any in-memory signatures not yet on disk (e.g. after a restart)."""
@@ -112,7 +232,6 @@ async def admin_save_images() -> JSONResponse:
                 storage._save_to_disk(sig)
                 saved += 1
 
-    # Build a summary of what's on disk
     folders: dict = {}
     if storage.SIGNATURES_DIR.exists():
         for day_dir in sorted(storage.SIGNATURES_DIR.iterdir()):
@@ -134,6 +253,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         "data": [s.model_dump() for s in storage.get_all()],
     })
     await manager.send_to(ws, {"event": "display_theme", "theme": _display_theme})
+    await manager.send_to(ws, {"event": "pledge_update", "text": _pledge_text})
+    await manager.send_to(ws, {"event": "cg_config", "config": _cg_config})
     try:
         while True:
             await ws.receive_text()  # keep alive; clients don't send data
@@ -142,8 +263,6 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
 
 # Serve built frontend.
-# Starlette 1.x changed route priority for {path:path} and "/" mounts.
-# Use fully-explicit routes so API routes defined above always win.
 _static_dir = Path(__file__).parent.parent / "frontend" / "dist"
 if _static_dir.exists():
     _assets_dir = _static_dir / "assets"
@@ -164,7 +283,6 @@ if _static_dir.exists():
     async def _admin_page() -> FileResponse:
         return FileResponse(_idx)
 
-    # Serve every non-HTML file sitting in dist root (images, favicon, etc.)
     for _sf in _static_dir.iterdir():
         if _sf.is_file() and _sf.suffix != ".html":
             _sfp = str(_sf)

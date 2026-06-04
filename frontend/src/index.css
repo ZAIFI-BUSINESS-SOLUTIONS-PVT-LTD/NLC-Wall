@@ -904,3 +904,586 @@ html, body, #root {
   font-size: 11px;
   opacity: 0.85;
 }
+
+/* ─── ADMIN PAGE — Signatures Database section ───────────────────────────── */
+
+.admin-db-section {
+  width: 100%;
+  max-width: 900px;
+  margin-top: 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 24px;
+  backdrop-filter: blur(12px);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+[data-theme="light"] .admin-db-section {
+  box-shadow: 0 2px 16px rgba(0,80,200,0.07);
+}
+
+.admin-db-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-db-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.admin-db-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-db-refresh {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--input-bg);
+  border: 1.5px solid var(--admin-btn-border);
+  color: var(--text-muted);
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-db-refresh:not(:disabled):hover {
+  border-color: var(--input-border-focus);
+  color: var(--input-border-focus);
+}
+.btn-db-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.admin-db-msg {
+  margin-bottom: 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  animation: fadeIn 0.3s ease;
+}
+
+.admin-db-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+}
+
+.admin-db-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-db-table thead tr {
+  background: var(--input-bg);
+}
+
+.admin-db-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--card-border);
+  white-space: nowrap;
+}
+
+.admin-db-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--card-border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.admin-db-table tbody tr:last-child td { border-bottom: none; }
+
+.admin-db-table tbody tr:hover td {
+  background: rgba(0,212,255,0.04);
+}
+
+[data-theme="light"] .admin-db-table tbody tr:hover td {
+  background: rgba(0,100,200,0.04);
+}
+
+.admin-db-table tbody tr.row-deleting { opacity: 0.4; pointer-events: none; }
+
+.col-num    { width: 48px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.col-name   { min-width: 160px; }
+.col-time   { width: 140px; white-space: nowrap; }
+.col-sig    { width: 52px; text-align: center; }
+.col-actions { width: 120px; }
+
+.db-name-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.db-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.db-name-input {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border-focus);
+  border-radius: 7px;
+  color: var(--input-text);
+  outline: none;
+  min-width: 0;
+}
+
+.btn-db-save, .btn-db-cancel {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1.5px solid;
+  transition: background 0.15s;
+}
+
+.btn-db-save {
+  background: rgba(0,200,80,0.12);
+  border-color: rgba(0,200,80,0.4);
+  color: var(--success-text);
+}
+.btn-db-save:hover { background: rgba(0,200,80,0.22); }
+
+.btn-db-cancel {
+  background: transparent;
+  border-color: var(--admin-btn-border);
+  color: var(--text-muted);
+}
+.btn-db-cancel:hover { border-color: var(--text-muted); color: var(--text); }
+
+.db-date {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+}
+.db-time {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.db-sig-badge {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+}
+.db-sig-badge.has-sig { color: var(--success-text); }
+.db-sig-badge.no-sig  { color: var(--text-muted); opacity: 0.5; }
+
+.db-action-btns {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.btn-db-edit, .btn-db-dl, .btn-db-del {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 14px;
+  border: 1.5px solid var(--admin-btn-border);
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-db-edit {
+  color: var(--cyan);
+  border-color: rgba(0,212,255,0.25);
+}
+.btn-db-edit:hover { background: rgba(0,212,255,0.1); border-color: var(--cyan); }
+
+[data-theme="light"] .btn-db-edit { color: #0077cc; border-color: rgba(0,100,200,0.3); }
+[data-theme="light"] .btn-db-edit:hover { background: rgba(0,100,200,0.08); }
+
+.btn-db-dl {
+  color: var(--gold-light);
+  border-color: rgba(212,175,55,0.25);
+}
+.btn-db-dl:hover { background: rgba(212,175,55,0.1); border-color: var(--gold-light); }
+
+[data-theme="light"] .btn-db-dl { color: #7a4e00; border-color: rgba(120,78,0,0.3); }
+[data-theme="light"] .btn-db-dl:hover { background: rgba(120,78,0,0.08); }
+
+.btn-db-del {
+  color: var(--danger-text);
+  border-color: rgba(255,80,80,0.2);
+}
+.btn-db-del:hover { background: var(--danger-hover-bg); border-color: var(--danger-border); }
+.btn-db-del:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.db-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 32px 0 !important;
+  font-size: 14px;
+}
+
+.admin-db-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.btn-db-page {
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--input-bg);
+  border: 1.5px solid var(--admin-btn-border);
+  color: var(--text-muted);
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-db-page:not(:disabled):hover {
+  border-color: var(--input-border-focus);
+  color: var(--input-border-focus);
+}
+.btn-db-page:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.db-page-info {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ─── ADMIN PAGE — Pledge content card ───────────────────────────────────── */
+
+/* Spans the full admin grid width */
+.pledge-card {
+  grid-column: 1 / -1;
+}
+
+.pledge-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.pledge-header-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.pledge-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1.5px solid var(--input-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--input-bg);
+  transition: border-color 0.2s;
+}
+
+.pledge-field:focus-within {
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--input-focus-shadow);
+}
+
+.pledge-textarea {
+  width: 100%;
+  padding: 14px 16px 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  font-family: var(--font);
+  background: transparent;
+  border: none;
+  color: var(--input-text);
+  outline: none;
+  resize: none;
+  display: block;
+}
+.pledge-textarea::placeholder { color: var(--input-placeholder); }
+
+.pledge-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 8px 16px;
+  border-top: 1px solid var(--card-border);
+  background: var(--input-bg);
+  gap: 12px;
+}
+
+.pledge-char-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pledge-action-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-pledge-clear {
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid var(--admin-btn-border);
+  color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn-pledge-clear:hover {
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.btn-pledge-save {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font);
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1.5px solid rgba(0, 212, 255, 0.4);
+  color: var(--cyan);
+  transition: background 0.2s, border-color 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+.btn-pledge-save:not(:disabled):hover {
+  background: rgba(0, 212, 255, 0.18);
+  border-color: var(--cyan);
+  transform: translateY(-1px);
+}
+.btn-pledge-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+[data-theme="light"] .btn-pledge-save {
+  background: rgba(0, 100, 200, 0.07);
+  border-color: rgba(0, 100, 200, 0.3);
+  color: #0066bb;
+}
+[data-theme="light"] .btn-pledge-save:not(:disabled):hover {
+  background: rgba(0, 100, 200, 0.14);
+  border-color: #0066bb;
+}
+
+.pledge-feedback {
+  margin-top: 12px;
+}
+
+/* ─── ADMIN PAGE — Chief Guest config card ───────────────────────────────── */
+
+.cg-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cg-toggle-row,
+.cg-retention-row,
+.cg-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cg-field-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.cg-date-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+  border-radius: 8px;
+  color: var(--input-text);
+  outline: none;
+  transition: border-color 0.2s;
+  color-scheme: dark;
+}
+.cg-date-input:focus { border-color: var(--input-border-focus); }
+
+[data-theme="light"] .cg-date-input { color-scheme: light; }
+
+/* ─── ADMIN PAGE — DB table chief guest column & badge ───────────────────── */
+
+.col-cg { width: 40px; text-align: center; }
+
+.db-cg-badge { display: inline-block; font-size: 14px; font-weight: 700; }
+.db-cg-badge.is-cg  { color: #d4af37; }
+.db-cg-badge.not-cg { color: var(--text-muted); opacity: 0.25; }
+
+.admin-db-table tbody tr.row-cg td {
+  background: rgba(212, 175, 55, 0.035);
+}
+
+.btn-db-cg {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 14px;
+  background: transparent;
+  border: 1.5px solid rgba(212, 175, 55, 0.2);
+  color: rgba(212, 175, 55, 0.35);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn-db-cg.active {
+  color: #d4af37;
+  border-color: rgba(212, 175, 55, 0.6);
+  background: rgba(212, 175, 55, 0.08);
+}
+.btn-db-cg:hover {
+  color: #d4af37;
+  border-color: rgba(212, 175, 55, 0.5);
+  background: rgba(212, 175, 55, 0.1);
+}
+
+/* ─── DISPLAY PAGE — Pledge text in HUD ──────────────────────────────────── */
+
+.hud-pledge {
+  margin-top: 7px;
+  font-size: 11px;
+  color: #334;
+  line-height: 1.45;
+  max-width: 220px;
+  opacity: 0.82;
+  font-style: italic;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 6px;
+  word-break: break-word;
+}
+
+.display-page--space .hud-pledge {
+  color: var(--text-muted);
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ─── DISPLAY PAGE — Chief Guest pinned banner ───────────────────────────── */
+
+.cg-banner {
+  position: absolute;
+  top: 130px;
+  left: 24px;
+  pointer-events: none;
+  user-select: none;
+  max-width: 220px;
+  animation: fadeIn 0.4s ease;
+}
+
+.cg-banner-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8a6200;
+  opacity: 0.8;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.display-page--space .cg-banner-title {
+  color: var(--gold);
+  opacity: 0.75;
+}
+
+.cg-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cg-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1.5px solid rgba(212, 175, 55, 0.6);
+  border-radius: 12px;
+  padding: 8px 10px 6px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgba(180, 130, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.cg-card-sig {
+  width: 180px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 6px;
+  /* Always white — signature strokes are dark navy on transparent bg */
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: block;
+}
+
+.cg-card-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a3800;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+.display-page--space .cg-card {
+  background: rgba(20, 16, 4, 0.72);
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 2px 14px rgba(212, 175, 55, 0.18);
+}
+
+.display-page--space .cg-card-name {
+  color: var(--gold-light);
+}
+
+/* cg-card-sig stays white on all themes — dark ink needs light paper */

@@ -58,13 +58,23 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
   ctx.rotate((rotation * Math.PI) / 180);
   ctx.scale(scale, scale);
 
-  const fontSize = sig.signature ? 20 : 24;
+  const fontSize = sig.signature ? 16 : 18;
   ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
-  const textW = ctx.measureText(sig.name).width;
-  const padX = 24;
-  const padY = 14;
-  const sigH = sig.signature ? 62 : 0;
-  const boxW = Math.max(textW + padX * 2, sig.signature ? 190 : 130);
+  const padX = 16;
+  const padY = 10;
+  const sigH = sig.signature ? 48 : 0;
+  const MAX_TEXT_W = 560; // cap so no card ever exceeds ~600px wide
+  let displayName = sig.name;
+  let textW = ctx.measureText(displayName).width;
+  if (textW > MAX_TEXT_W) {
+    while (textW > MAX_TEXT_W && displayName.length > 1) {
+      displayName = displayName.slice(0, -1);
+      textW = ctx.measureText(displayName + "…").width;
+    }
+    displayName += "…";
+    textW = ctx.measureText(displayName).width;
+  }
+  const boxW = Math.max(textW + padX * 2, sig.signature ? 150 : 100);
   const boxH = fontSize + padY * 2 + sigH;
 
   const shapeIdx = paletteIdx % 3;
@@ -120,7 +130,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
   ctx.fillStyle = textColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(sig.name, 0, sig.signature ? -sigH / 2 : 0);
+  ctx.fillText(displayName, 0, sig.signature ? -sigH / 2 : 0);
 
   if (sig.signature) {
     drawSignatureImage(ctx, sig.signature, 0, fontSize / 2 + padY / 2, boxW - 16, sigH - 6, cardStyle.useInvertedSignature);

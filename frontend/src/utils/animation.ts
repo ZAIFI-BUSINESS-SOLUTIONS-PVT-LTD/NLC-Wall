@@ -48,13 +48,13 @@ export function createItem(sig: Signature, canvasW: number, canvasH: number): Fl
   return {
     sig,
     paletteIdx: paletteForId(sig.id),
-    x: rand(100, canvasW - 100),
-    y: rand(100, canvasH - 100),
+    x: rand(180, canvasW - 180),
+    y: rand(120, canvasH - 120),
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
-    rotation: rand(-6, 6),
-    rotationSpeed: rand(-0.035, 0.035),
-    scale: 1.8,
+    rotation: rand(-8, 8),
+    rotationSpeed: rand(-2.2, 2.2),
+    scale: 1.3,
     opacity: 1,
     glowAlpha: 1,
     entryProgress: 0,
@@ -87,16 +87,19 @@ export function tickItems(
     item.x += (item.vx + sineX) * dt * 60;
     item.y += item.vy * dt * 60;
 
-    const pad = 70;
-    if (item.x < pad && item.vx < 0) item.vx *= -1;
-    if (item.x > canvasW - pad && item.vx > 0) item.vx *= -1;
-    if (item.y < pad && item.vy < 0) item.vy *= -1;
-    if (item.y > canvasH - pad && item.vy > 0) item.vy *= -1;
+    const halfW = estimateHalfW(item);
+    const halfH = estimateHalfH(item);
+    if (item.x < halfW && item.vx < 0) item.vx *= -1;
+    if (item.x > canvasW - halfW && item.vx > 0) item.vx *= -1;
+    if (item.y < halfH && item.vy < 0) item.vy *= -1;
+    if (item.y > canvasH - halfH && item.vy > 0) item.vy *= -1;
+    item.x = Math.max(halfW, Math.min(canvasW - halfW, item.x));
+    item.y = Math.max(halfH, Math.min(canvasH - halfH, item.y));
 
-    item.rotation += item.rotationSpeed;
-    // Bounce rotation back within ±20° so names never appear upside-down
-    if (item.rotation > 20) { item.rotation = 20; item.rotationSpeed = -Math.abs(item.rotationSpeed); }
-    if (item.rotation < -20) { item.rotation = -20; item.rotationSpeed = Math.abs(item.rotationSpeed); }
+    item.rotation += item.rotationSpeed * dt;
+    // Hard-clamp to ±60° — cards must never appear upside-down
+    if (item.rotation > 60) { item.rotation = 60; item.rotationSpeed = -Math.abs(item.rotationSpeed); }
+    if (item.rotation < -60) { item.rotation = -60; item.rotationSpeed = Math.abs(item.rotationSpeed); }
 
     // Newest 10 float at the same full size.
     // Once count exceeds 10, oldest starts shrinking (receding into distance).
@@ -107,17 +110,17 @@ export function tickItems(
 
     if (reverseRank < FRONT_COUNT) {
       opacity = 1.0;
-      targetScale = 1.35;
+      targetScale = 1.0;
     } else {
       const t = Math.min(1, (reverseRank - FRONT_COUNT) / 22);
       opacity = lerp(0.92, 0.12, t);
-      targetScale = lerp(1.18, 0.50, t);
+      targetScale = lerp(0.90, 0.38, t);
     }
 
     item.opacity = opacity;
 
     if (item.entryProgress < 1) {
-      item.scale = lerp(1.8, targetScale, easeOut(item.entryProgress));
+      item.scale = lerp(1.3, targetScale, easeOut(item.entryProgress));
     } else {
       // Smooth scale transition when displaced by a new arrival
       item.scale += (targetScale - item.scale) * Math.min(1, dt * 2.5);
@@ -125,6 +128,14 @@ export function tickItems(
   });
 
   separateItems(items);
+
+  // Re-clamp after separation in case push forces crossed a border
+  items.forEach(item => {
+    const halfW = estimateHalfW(item);
+    const halfH = estimateHalfH(item);
+    item.x = Math.max(halfW, Math.min(canvasW - halfW, item.x));
+    item.y = Math.max(halfH, Math.min(canvasH - halfH, item.y));
+  });
 }
 
 function separateItems(items: FloatingItem[]): void {
@@ -153,11 +164,15 @@ function separateItems(items: FloatingItem[]): void {
 }
 
 function estimateHalfW(item: FloatingItem): number {
-  return (Math.max(item.sig.name.length * 16, 120) / 2 + 36) * item.scale;
+  // Tamil glyphs render wider; 28px/char + box padding, capped at canvas MAX_TEXT_W (560px) + 48px padding
+  const minBoxW = item.sig.signature ? 220 : 160;
+  const estBoxW = Math.min(Math.max(item.sig.name.length * 28 + 48, minBoxW), 608);
+  return (estBoxW / 2 + 24) * item.scale; // +24 extra for glow/shadow
 }
 
 function estimateHalfH(item: FloatingItem): number {
-  return ((item.sig.signature ? 84 : 52) / 2 + 14) * item.scale;
+  const boxH = item.sig.signature ? 78 : 42; // fontSize+padY*2+sigH: (16+20+48) or (18+20)
+  return (boxH / 2 + 18) * item.scale;
 }
 
 function lerp(a: number, b: number, t: number): number {

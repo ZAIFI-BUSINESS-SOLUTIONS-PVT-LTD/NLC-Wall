@@ -66,10 +66,6 @@ def count_audience() -> int:
         return sum(1 for s in _store if not s.is_chief_guest)
 
 
-def count_cg() -> int:
-    with _lock:
-        return sum(1 for s in _store if s.is_chief_guest)
-
 
 def remove(sig_id: str) -> bool:
     """Remove one signature from in-memory store and DB. Returns True if found."""

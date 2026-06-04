@@ -39,7 +39,6 @@ export function SignatureCanvas({ onExport, disabled, resetToken }: Props): Reac
     setHasDrawn(false);
     setCanUndo(false);
     onExport(null);
-    // Re-draw guide (stays on guide canvas — nothing to refresh here)
   }, [onExport]);
 
   const undoStroke = useCallback(() => {

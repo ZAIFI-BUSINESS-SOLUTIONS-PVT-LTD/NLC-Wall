@@ -220,14 +220,3 @@ def db_count() -> int:
         finally:
             conn.close()
 
-
-def db_count_audience() -> int:
-    with _lock:
-        conn = _get_conn()
-        try:
-            row = conn.execute(
-                "SELECT COUNT(*) AS cnt FROM signatures WHERE is_chief_guest = 0"
-            ).fetchone()
-            return row["cnt"] if row else 0
-        finally:
-            conn.close()

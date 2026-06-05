@@ -37,6 +37,12 @@ export function DisplayPage(): React.ReactElement {
   const [pledge, setPledge] = useState("");
   const newSigTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Auto-refresh every 10 minutes to prevent cards from settling in corners
+  useEffect(() => {
+    const t = setTimeout(() => window.location.reload(), 10 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Audience sigs drive the floating wall and the count
   const audienceSigs = useMemo(() => sigs.filter((s) => !s.is_chief_guest), [sigs]);
   const activeCgSigs = useMemo(
@@ -89,20 +95,20 @@ export function DisplayPage(): React.ReactElement {
     <div className={`display-page${isDark ? " display-page--space" : ""}`}>
       <FloatingWall signatures={audienceSigs} newSig={newSig} displayTheme={displayTheme} />
 
+      {/* Top-right NLC logo */}
+      <img src="/nlclogo70th.png" alt="NLC" className="hud-logo-corner" />
+
       {/* Top-left HUD */}
       <div className="display-hud">
-        <img src="/nlclogo70th.png" alt="NLC" className="hud-logo" />
-        <div className="hud-text">
-          <div className="hud-event">NLC Neyveli Book Fair</div>
-          <div className="hud-title">Live Sign Wall</div>
-          <div className="hud-count">
-            <span className="hud-count-num">{rollingCount}</span>
-            <span className="hud-count-label"> signed the wall</span>
-          </div>
-          {pledge && (
-            <div className="hud-pledge">{pledge}</div>
-          )}
+        <div className="hud-event">NLC Neyveli Book Fair</div>
+        <div className="hud-title">Live Sign Wall</div>
+        <div className="hud-count">
+          <span className="hud-count-num">{rollingCount}</span>
+          <span className="hud-count-label"> signed the wall</span>
         </div>
+        {pledge && (
+          <div className="hud-pledge">{pledge}</div>
+        )}
       </div>
 
       {/* Chief Guest pinned panel — top-left, always visible while CG sigs exist */}

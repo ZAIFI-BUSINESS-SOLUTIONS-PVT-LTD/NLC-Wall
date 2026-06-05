@@ -38,6 +38,11 @@ const FLOAT_SPEED_MIN = 0.12;
 const FLOAT_SPEED_MAX = 0.38;
 const ENTRY_DURATION = 0.7;
 
+// Bottom-left corner reserved for the Chief Guest panel overlay.
+// Keep floating cards out of this rectangle.
+const CG_ZONE_W = 280;   // px from left edge
+const CG_ZONE_H = 460;   // px from bottom edge
+
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
@@ -45,11 +50,19 @@ function rand(min: number, max: number): number {
 export function createItem(sig: Signature, canvasW: number, canvasH: number): FloatingItem {
   const angle = rand(0, Math.PI * 2);
   const speed = rand(FLOAT_SPEED_MIN, FLOAT_SPEED_MAX);
+  // Avoid spawning inside the bottom-left CG zone
+  let x = rand(180, canvasW - 180);
+  let y = rand(120, canvasH - 120);
+  for (let i = 0; i < 12; i++) {
+    if (!(x < CG_ZONE_W && y > canvasH - CG_ZONE_H)) break;
+    x = rand(180, canvasW - 180);
+    y = rand(120, canvasH - 120);
+  }
   return {
     sig,
     paletteIdx: paletteForId(sig.id),
-    x: rand(180, canvasW - 180),
-    y: rand(120, canvasH - 120),
+    x,
+    y,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
     rotation: rand(-8, 8),
@@ -95,6 +108,19 @@ export function tickItems(
     if (item.y > canvasH - halfH && item.vy > 0) item.vy *= -1;
     item.x = Math.max(halfW, Math.min(canvasW - halfW, item.x));
     item.y = Math.max(halfH, Math.min(canvasH - halfH, item.y));
+
+    // Bounce off the bottom-left Chief Guest panel zone
+    if (item.x - halfW < CG_ZONE_W && item.y + halfH > canvasH - CG_ZONE_H) {
+      const penetrateRight = CG_ZONE_W - (item.x - halfW);
+      const penetrateTop = (item.y + halfH) - (canvasH - CG_ZONE_H);
+      if (penetrateRight < penetrateTop) {
+        if (item.vx < 0) item.vx *= -1;
+        item.x = Math.max(item.x, CG_ZONE_W + halfW);
+      } else {
+        if (item.vy > 0) item.vy *= -1;
+        item.y = Math.min(item.y, canvasH - CG_ZONE_H - halfH);
+      }
+    }
 
     item.rotation += item.rotationSpeed * dt;
     // Hard-clamp to ±60° — cards must never appear upside-down

@@ -12,6 +12,13 @@ export interface ChiefGuestConfig {
   retention_until: number | null; // unix ms
 }
 
+export interface PledgeConfig {
+  tamil: string;
+  hindi: string;
+  english: string;
+  duration_seconds: number; // per-language display time on the rotating panel
+}
+
 export type DisplayTheme = "sky" | "space" | "aurora" | "ocean" | "neon" | "forest" | "sunset";
 
 export type WSEvent =
@@ -22,5 +29,5 @@ export type WSEvent =
   | { event: "clear" }
   | { event: "clear_chief_guests" }
   | { event: "display_theme"; theme: DisplayTheme }
-  | { event: "pledge_update"; text: string }
+  | { event: "pledge_config"; config: PledgeConfig }
   | { event: "cg_config"; config: ChiefGuestConfig };

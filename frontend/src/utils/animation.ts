@@ -38,10 +38,15 @@ const FLOAT_SPEED_MIN = 0.12;
 const FLOAT_SPEED_MAX = 0.38;
 const ENTRY_DURATION = 0.7;
 
-// Bottom-left corner reserved for the Chief Guest panel overlay.
-// Keep floating cards out of this rectangle.
-const CG_ZONE_W = 280;   // px from left edge
-const CG_ZONE_H = 460;   // px from bottom edge
+// Bottom strip reserved for Chief Guest cards (horizontal row, up to 5 cards).
+// 5 cards × 130px + 4 gaps × 8px + 24px left margin ≈ 710px wide, 100px tall.
+// Keep this as a bottom-left zone cards bounce off.
+const CG_ZONE_W = 730;   // px from left edge (covers 5 cards)
+const CG_ZONE_H = 120;   // px from bottom edge
+
+// Left-center strip reserved for the pledge panel (left: 16px, width ~300px, vertically centered).
+// Approximated as a fixed px-wide band; cards bounce off its right edge.
+const PLEDGE_ZONE_W = 460; // px from left edge (420px panel + 16px margin + 24px buffer)
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -50,11 +55,13 @@ function rand(min: number, max: number): number {
 export function createItem(sig: Signature, canvasW: number, canvasH: number): FloatingItem {
   const angle = rand(0, Math.PI * 2);
   const speed = rand(FLOAT_SPEED_MIN, FLOAT_SPEED_MAX);
-  // Avoid spawning inside the bottom-left CG zone
+  // Avoid spawning inside the bottom-left CG zone or the left-center pledge zone
   let x = rand(180, canvasW - 180);
   let y = rand(120, canvasH - 120);
-  for (let i = 0; i < 12; i++) {
-    if (!(x < CG_ZONE_W && y > canvasH - CG_ZONE_H)) break;
+  for (let i = 0; i < 16; i++) {
+    const inCgZone = x < CG_ZONE_W && y > canvasH - CG_ZONE_H;
+    const inPledgeZone = x < PLEDGE_ZONE_W && y > canvasH * 0.14 && y < canvasH * 0.86;
+    if (!inCgZone && !inPledgeZone) break;
     x = rand(180, canvasW - 180);
     y = rand(120, canvasH - 120);
   }
@@ -120,6 +127,18 @@ export function tickItems(
         if (item.vy > 0) item.vy *= -1;
         item.y = Math.min(item.y, canvasH - CG_ZONE_H - halfH);
       }
+    }
+
+    // Bounce off the left-center pledge panel zone (vertically centered, ~15%–85% of height)
+    const pledgeTop = canvasH * 0.14;
+    const pledgeBottom = canvasH * 0.86;
+    if (
+      item.x - halfW < PLEDGE_ZONE_W &&
+      item.y + halfH > pledgeTop &&
+      item.y - halfH < pledgeBottom
+    ) {
+      if (item.vx < 0) item.vx *= -1;
+      item.x = Math.max(item.x, PLEDGE_ZONE_W + halfW);
     }
 
     item.rotation += item.rotationSpeed * dt;

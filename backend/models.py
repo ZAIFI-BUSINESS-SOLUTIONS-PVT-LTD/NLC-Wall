@@ -62,13 +62,22 @@ class UpdateNameBody(BaseModel):
         return v
 
 
-class PledgeBody(BaseModel):
-    text: str
+class PledgeConfigBody(BaseModel):
+    tamil: str = ""
+    hindi: str = ""
+    english: str = ""
+    duration_seconds: int = 90
 
-    @field_validator("text")
+    @field_validator("tamil", "hindi", "english")
     @classmethod
     def text_strip_limit(cls, v: str) -> str:
-        return v.strip()[:2000]
+        return v.strip()[:4000]
+
+    @field_validator("duration_seconds")
+    @classmethod
+    def duration_in_range(cls, v: int) -> int:
+        # Clamp to a sane range: at least 5s to read, at most 10 minutes.
+        return max(5, min(v, 600))
 
 
 class ChiefGuestConfigBody(BaseModel):

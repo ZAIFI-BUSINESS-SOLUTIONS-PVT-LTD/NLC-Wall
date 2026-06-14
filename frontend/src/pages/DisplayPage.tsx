@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { Signature, WSEvent, DisplayTheme } from "../types";
+import { Signature, WSEvent, DisplayTheme, PledgeConfig } from "../types";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { FloatingWall } from "../components/FloatingWall";
+import { MascotCorner } from "../components/MascotCorner";
 
 // Animates a number rolling from its previous value to a new target.
 function useRollingCount(target: number): number {
@@ -34,7 +35,8 @@ export function DisplayPage(): React.ReactElement {
   const [sigs, setSigs] = useState<Signature[]>([]);
   const [newSig, setNewSig] = useState<Signature | null>(null);
   const [displayTheme, setDisplayTheme] = useState<DisplayTheme>("sky");
-  const [pledge, setPledge] = useState("");
+  const [pledgeConfig, setPledgeConfig] = useState<PledgeConfig | null>(null);
+  const [pledgeIdx, setPledgeIdx] = useState(0);
   const newSigTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-refresh every 10 minutes to prevent cards from settling in corners
@@ -51,6 +53,34 @@ export function DisplayPage(): React.ReactElement {
   );
 
   const rollingCount = useRollingCount(audienceSigs.length);
+
+  // Languages to rotate through, in fixed priority order: Tamil → Hindi → English.
+  // Empty languages are skipped so a blank field never shows a blank panel.
+  const pledgeItems = useMemo(() => {
+    if (!pledgeConfig) return [];
+    const order = [
+      { lang: "ta", label: "தமிழ்", text: pledgeConfig.tamil },
+      { lang: "hi", label: "हिन्दी", text: pledgeConfig.hindi },
+      { lang: "en", label: "English", text: pledgeConfig.english },
+    ];
+    return order.filter((p) => p.text && p.text.trim().length > 0);
+  }, [pledgeConfig]);
+
+  const durationSeconds = pledgeConfig?.duration_seconds ?? 90;
+
+  // Auto-rotate the visible language every `durationSeconds`. Resets to the top
+  // (Tamil) whenever the texts or timing change so a fresh save restarts cleanly.
+  useEffect(() => {
+    setPledgeIdx(0);
+    if (pledgeItems.length <= 1) return;
+    const durMs = Math.max(5, durationSeconds) * 1000;
+    const t = setInterval(() => {
+      setPledgeIdx((i) => (i + 1) % pledgeItems.length);
+    }, durMs);
+    return () => clearInterval(t);
+  }, [pledgeItems, durationSeconds]);
+
+  const currentPledge = pledgeItems[pledgeIdx] ?? pledgeItems[0] ?? null;
 
   // Fetch persisted theme on mount
   useEffect(() => {
@@ -82,8 +112,8 @@ export function DisplayPage(): React.ReactElement {
       setSigs((prev) => prev.filter((s) => !s.is_chief_guest));
     } else if (event.event === "display_theme") {
       setDisplayTheme(event.theme);
-    } else if (event.event === "pledge_update") {
-      setPledge(event.text);
+    } else if (event.event === "pledge_config") {
+      setPledgeConfig(event.config);
     }
   }, []);
 
@@ -106,9 +136,6 @@ export function DisplayPage(): React.ReactElement {
           <span className="hud-count-num">{rollingCount}</span>
           <span className="hud-count-label"> signed the wall</span>
         </div>
-        {pledge && (
-          <div className="hud-pledge">{pledge}</div>
-        )}
       </div>
 
       {/* Chief Guest pinned panel — top-left, always visible while CG sigs exist */}
@@ -128,15 +155,33 @@ export function DisplayPage(): React.ReactElement {
         </div>
       )}
 
-      {/* Bottom center */}
-      <div className="display-footer-hud">
-        <span className="hud-url">Scan QR or visit this server's IP on your phone</span>
-      </div>
+      {/* Rotating multilingual pledge panel — Tamil → Hindi → English */}
+      {currentPledge && (
+        <div className="pledge-panel" key={currentPledge.lang}>
+          <div className="pledge-panel-head">
+            <span className="pledge-panel-badge">{currentPledge.label}</span>
+            {pledgeItems.length > 1 && (
+              <div className="pledge-panel-dots">
+                {pledgeItems.map((p, i) => (
+                  <span
+                    key={p.lang}
+                    className={`pledge-dot${i === pledgeIdx ? " active" : ""}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="pledge-panel-body">{currentPledge.text}</div>
+        </div>
+      )}
 
       {/* Admin gear — only visible when ?admin is in the URL */}
       {window.location.search.includes("admin") && (
         <a href="/admin" className="admin-gear" title="Admin">⚙</a>
       )}
+
+      {/* Mascot — slides up from bottom-right like a news channel footer */}
+      <MascotCorner />
 
     </div>
   );

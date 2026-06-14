@@ -6,7 +6,7 @@
   --gold: #d4af37;
   --gold-light: #f5d97e;
   --cyan: #00d4ff;
-  --font: 'Noto Sans Tamil', Latha, sans-serif;
+  --font: 'Noto Sans Tamil', 'Noto Sans Devanagari', 'Nirmala UI', Latha, sans-serif;
 
   --page-bg: radial-gradient(ellipse at 50% 0%, #0d1b3e 0%, #060a1a 70%);
   --body-bg: #060a1a;
@@ -426,7 +426,7 @@ html, body, #root {
   min-height: 100vh;
   overflow-y: auto;
   background: var(--page-bg);
-  padding: 32px 20px 60px;
+  padding: 32px 24px 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -437,10 +437,10 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 18px;
-  margin-bottom: 36px;
+  margin-bottom: 28px;
   text-align: left;
   width: 100%;
-  max-width: 800px;
+  max-width: 1020px;
 }
 
 .admin-logo {
@@ -484,20 +484,20 @@ html, body, #root {
 
 .admin-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
-/* Card grid */
+/* ── Card grid — 2 equal columns, max 1020px ── */
 .admin-grid {
   width: 100%;
-  max-width: 800px;
+  max-width: 1020px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
 }
 
 .admin-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 16px;
-  padding: 24px;
+  padding: 22px 24px;
   backdrop-filter: blur(12px);
   transition: background 0.3s, border-color 0.3s;
 }
@@ -506,33 +506,169 @@ html, body, #root {
   box-shadow: 0 2px 16px rgba(0,80,200,0.07);
 }
 
-.admin-card-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 18px;
+/* Full-width cards */
+.admin-card--overview,
+.pledge-card {
+  grid-column: 1 / -1;
 }
 
-/* Settings row */
-.admin-row {
+.admin-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+/* ── Overview card ── */
+.admin-card--overview {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
+  padding: 20px 28px;
+  flex-wrap: wrap;
 }
 
-.admin-row-label {
+.overview-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.overview-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0 28px;
+}
+
+.overview-stat:first-child { padding-left: 0; }
+
+.overview-stat-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--gold-light);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-stat-value--gold { color: var(--gold-light); }
+
+[data-theme="light"] .overview-stat-value { color: #0055bb; }
+
+.overview-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.overview-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--card-border);
+  flex-shrink: 0;
+}
+
+.overview-live-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.4;
+  margin: 4px auto 4px;
+  transition: background 0.3s, opacity 0.3s;
+}
+
+.overview-live-dot.online {
+  background: #00e060;
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(0,224,96,0.5);
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(0,224,96,0.4); }
+  50%       { box-shadow: 0 0 14px rgba(0,224,96,0.8); }
+}
+
+.overview-nav {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.overview-nav-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1.5px solid var(--admin-btn-border);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font);
+  background: var(--input-bg);
+  transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+.overview-nav-btn:hover {
+  border-color: var(--input-border-focus);
+  color: var(--input-border-focus);
+  transform: translateY(-1px);
+}
+
+.overview-nav-btn--primary {
+  background: rgba(0,212,255,0.08);
+  border-color: rgba(0,212,255,0.35);
+  color: var(--cyan);
+}
+.overview-nav-btn--primary:hover {
+  background: rgba(0,212,255,0.15);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+[data-theme="light"] .overview-nav-btn--primary {
+  background: rgba(0,100,200,0.07);
+  border-color: rgba(0,100,200,0.3);
+  color: #0066bb;
+}
+
+/* ── Settings sections ── */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
 }
 
-.admin-row-icon { font-size: 18px; }
+.settings-label-active {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--card-border);
+  margin: 14px 0;
+}
 
 .theme-toggle-group {
   display: flex;
@@ -545,7 +681,7 @@ html, body, #root {
 }
 
 .theme-btn {
-  padding: 8px 20px;
+  padding: 7px 16px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
@@ -574,53 +710,54 @@ html, body, #root {
   color: var(--text);
 }
 
-/* Stats */
-.admin-stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* ── Danger Zone card ── */
+.admin-card--danger {
+  border-color: rgba(255,80,80,0.15);
+}
+
+.danger-zone-title {
+  color: var(--danger-text) !important;
+  opacity: 0.7;
+}
+
+.danger-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 16px;
 }
 
-.admin-stat {
-  text-align: center;
-  padding: 16px;
-  background: var(--input-bg);
-  border-radius: 12px;
-  border: 1px solid var(--card-border);
+.danger-action-info {
+  flex: 1;
+  min-width: 0;
 }
 
-.admin-stat-value {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--gold-light);
-  line-height: 1;
+.danger-action-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
 }
 
-[data-theme="light"] .admin-stat-value { color: #0055bb; }
-
-.admin-stat-label {
-  font-size: 11px;
+.danger-action-desc {
+  font-size: 12px;
   color: var(--text-muted);
-  margin-top: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  line-height: 1.4;
 }
 
-/* Actions */
-.admin-action-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-bottom: 16px;
-  line-height: 1.5;
+.danger-divider {
+  height: 1px;
+  background: rgba(255,80,80,0.12);
+  margin: 14px 0;
 }
 
 .btn-danger {
   width: 100%;
-  padding: 14px;
-  font-size: 15px;
+  padding: 12px;
+  font-size: 14px;
   font-weight: 700;
   font-family: var(--font);
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
   background: var(--danger-bg);
   border: 1.5px solid var(--danger-border);
@@ -630,9 +767,17 @@ html, body, #root {
 .btn-danger:not(:disabled):hover { background: var(--danger-hover-bg); transform: translateY(-1px); }
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Compact version for danger zone rows */
+.btn-danger--compact {
+  width: auto;
+  padding: 8px 18px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
 .admin-feedback {
-  margin-top: 12px;
-  padding: 10px 14px;
+  margin-top: 10px;
+  padding: 9px 14px;
   border-radius: 8px;
   font-size: 13px;
   text-align: center;
@@ -642,29 +787,22 @@ html, body, #root {
   animation: fadeIn 0.3s ease;
 }
 
-/* Nav links */
-.admin-nav-links {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+/* Legacy nav (unused but kept for safety) */
+.admin-nav-links { display: flex; flex-direction: column; gap: 10px; }
 .admin-nav-btn {
-  display: block;
-  padding: 12px 18px;
-  border-radius: 10px;
-  border: 1.5px solid var(--admin-btn-border);
-  color: var(--text);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-  background: var(--input-bg);
+  display: block; padding: 12px 18px; border-radius: 10px;
+  border: 1.5px solid var(--admin-btn-border); color: var(--text);
+  text-decoration: none; font-size: 14px; font-weight: 500;
+  transition: border-color 0.2s, color 0.2s; background: var(--input-bg);
 }
-.admin-nav-btn:hover {
-  border-color: var(--input-border-focus);
-  color: var(--input-border-focus);
-}
+.admin-nav-btn:hover { border-color: var(--input-border-focus); color: var(--input-border-focus); }
+
+/* Legacy stat grid (unused but kept) */
+.admin-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.admin-stat { text-align: center; padding: 16px; background: var(--input-bg); border-radius: 12px; border: 1px solid var(--card-border); }
+.admin-stat-value { font-size: 32px; font-weight: 700; color: var(--gold-light); line-height: 1; }
+[data-theme="light"] .admin-stat-value { color: #0055bb; }
+.admin-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* Export buttons */
 .admin-export-stack {
@@ -879,7 +1017,7 @@ html, body, #root {
 
 .admin-db-section {
   width: 100%;
-  max-width: 900px;
+  max-width: 1020px;
   margin-top: 24px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -1221,6 +1359,85 @@ html, body, #root {
   white-space: nowrap;
 }
 
+/* ── Admin: multilingual pledge — duration + per-language blocks ── */
+.pledge-duration-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+}
+
+.pledge-duration-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pledge-duration-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pledge-duration-input {
+  width: 90px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: var(--font);
+  border-radius: 8px;
+  border: 1.5px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
+  outline: none;
+  text-align: center;
+}
+
+.pledge-duration-input:focus {
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--input-focus-shadow);
+}
+
+.pledge-duration-unit {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Pledge — 3-column layout on full-width card */
+.pledge-langs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 720px) {
+  .pledge-langs-grid { grid-template-columns: 1fr; }
+  .admin-grid { grid-template-columns: 1fr; }
+}
+
+.pledge-lang-block {
+  margin-bottom: 0;
+}
+
+.pledge-lang-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.pledge-save-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
 .pledge-action-btns {
   display: flex;
   gap: 8px;
@@ -1361,46 +1578,132 @@ html, body, #root {
 
 /* ─── DISPLAY PAGE — Pledge text in HUD ──────────────────────────────────── */
 
-.hud-pledge {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #1a2040;
-  line-height: 1.55;
-  opacity: 0.92;
-  font-style: normal;
-  font-weight: 400;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  padding-top: 8px;
-  word-break: break-word;
-  white-space: pre-wrap;
+/* ─── DISPLAY PAGE — Rotating multilingual pledge panel ──────────────────── */
+
+.pledge-panel {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  transform: translateY(-50%);
+  width: min(30vw, 420px);
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  pointer-events: none;
+  user-select: none;
+  z-index: 12;
+  animation: pledgeFade 0.7s ease;
 }
 
-.display-page--space .hud-pledge {
-  color: rgba(200, 220, 255, 0.88);
-  border-top-color: rgba(255, 255, 255, 0.12);
+@keyframes pledgeFade {
+  from { opacity: 0; transform: translateY(-50%) translateX(-18px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+
+.pledge-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.pledge-panel-badge {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--gold, #b8860b);
+  background: rgba(212, 175, 55, 0.12);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.pledge-panel-dots {
+  display: flex;
+  gap: 7px;
+}
+
+.pledge-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.18);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.pledge-dot.active {
+  background: var(--gold, #b8860b);
+  transform: scale(1.25);
+}
+
+.pledge-panel-body {
+  font-size: clamp(8px, 0.72vw, 10.5px);
+  line-height: 1.45;
+  color: #1a2040;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  font-weight: 400;
+}
+
+/* Dark display themes — panel goes translucent-dark for contrast */
+.display-page--space .pledge-panel {
+  background: rgba(10, 16, 36, 0.74);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.5);
+}
+
+.display-page--space .pledge-panel-head {
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+}
+
+.display-page--space .pledge-panel-badge {
+  color: var(--gold-light, #f5d97e);
+  background: rgba(245, 217, 126, 0.14);
+}
+
+.display-page--space .pledge-dot {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.display-page--space .pledge-dot.active {
+  background: var(--gold-light, #f5d97e);
+}
+
+.display-page--space .pledge-panel-body {
+  color: rgba(225, 235, 255, 0.95);
 }
 
 /* ─── DISPLAY PAGE — Chief Guest pinned banner ───────────────────────────── */
 
 .cg-banner {
   position: absolute;
-  bottom: 60px;
+  bottom: 16px;
   left: 24px;
   pointer-events: none;
   user-select: none;
-  max-width: 220px;
+  max-width: calc(100vw - 48px);
   animation: fadeIn 0.4s ease;
   z-index: 10;
 }
 
 .cg-banner-title {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: #8a6200;
   opacity: 0.8;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   padding-left: 2px;
 }
 
@@ -1409,31 +1712,35 @@ html, body, #root {
   opacity: 0.75;
 }
 
+/* Horizontal row — up to 5 VIP cards side by side */
 .cg-cards {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
 }
 
 .cg-card {
   background: rgba(255, 255, 255, 0.88);
   border: 1.5px solid rgba(212, 175, 55, 0.6);
-  border-radius: 12px;
-  padding: 8px 10px 6px;
+  border-radius: 10px;
+  padding: 6px 8px 5px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 12px rgba(180, 130, 0, 0.18);
+  box-shadow: 0 2px 10px rgba(180, 130, 0, 0.18);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  width: 130px;
+  flex-shrink: 0;
 }
 
 .cg-card-sig {
-  width: 180px;
-  height: 80px;
+  width: 114px;
+  height: 54px;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 5px;
   /* Always white — signature strokes are dark navy on transparent bg */
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -1441,11 +1748,15 @@ html, body, #root {
 }
 
 .cg-card-name {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: #5a3800;
   text-align: center;
   letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 
 .display-page--space .cg-card {

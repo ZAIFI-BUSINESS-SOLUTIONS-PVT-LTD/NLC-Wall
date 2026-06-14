@@ -31,3 +31,6 @@ desktop.ini
 # Signatures data (runtime only)
 signatures.json
 signatures/
+
+# Vite transient config build artifact (regenerated on each run)
+frontend/vite.config.ts.timestamp-*.mjs

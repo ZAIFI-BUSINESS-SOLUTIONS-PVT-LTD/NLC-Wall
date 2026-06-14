@@ -5,12 +5,14 @@ import json
 import logging
 from pathlib import Path
 
+from paths import LOG_PATH, FRONTEND_DIST
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("signwall.log", encoding="utf-8"),
+        logging.FileHandler(str(LOG_PATH), encoding="utf-8"),
     ],
 )
 logger = logging.getLogger(__name__)
@@ -25,14 +27,15 @@ import database
 import moderation
 from models import (
     SubmitRequest, Signature, SubmitResponse, HealthResponse,
-    ThemeBody, UpdateNameBody, PledgeBody, ChiefGuestConfigBody, ChiefGuestMarkBody,
+    ThemeBody, UpdateNameBody, PledgeConfigBody, ChiefGuestConfigBody, ChiefGuestMarkBody,
 )
+from pledge_defaults import DEFAULT_PLEDGE_CONFIG
 from websocket import manager
 
 app = FastAPI(title="Live Sign Wall")
 
 _display_theme: str = "sky"
-_pledge_text: str = ""
+_pledge_config: dict = dict(DEFAULT_PLEDGE_CONFIG)
 _cg_config: dict = {"enabled": False, "retention_mode": "forever", "retention_until": None}
 
 app.add_middleware(
@@ -44,10 +47,15 @@ app.add_middleware(
 
 
 def _load_server_config() -> None:
-    global _pledge_text, _cg_config
-    pledge = database.db_config_get("pledge_text")
-    if pledge is not None:
-        _pledge_text = pledge
+    global _pledge_config, _cg_config
+    pledge = database.db_config_get("pledge_config")
+    if pledge:
+        try:
+            stored = json.loads(pledge)
+            # Merge over defaults so missing keys fall back gracefully.
+            _pledge_config = {**DEFAULT_PLEDGE_CONFIG, **stored}
+        except Exception:
+            pass
     cg = database.db_config_get("cg_config")
     if cg:
         try:
@@ -132,18 +140,23 @@ async def set_display_theme(body: ThemeBody) -> JSONResponse:
     return JSONResponse({"theme": _display_theme})
 
 
-@app.get("/admin/pledge")
-async def get_pledge() -> JSONResponse:
-    return JSONResponse({"text": _pledge_text})
+@app.get("/admin/pledge-config")
+async def get_pledge_config() -> JSONResponse:
+    return JSONResponse(_pledge_config)
 
 
-@app.post("/admin/pledge")
-async def set_pledge(body: PledgeBody) -> JSONResponse:
-    global _pledge_text
-    _pledge_text = body.text
-    database.db_config_set("pledge_text", _pledge_text)
-    await manager.broadcast({"event": "pledge_update", "text": _pledge_text})
-    return JSONResponse({"text": _pledge_text})
+@app.post("/admin/pledge-config")
+async def set_pledge_config(body: PledgeConfigBody) -> JSONResponse:
+    global _pledge_config
+    _pledge_config = {
+        "tamil": body.tamil,
+        "hindi": body.hindi,
+        "english": body.english,
+        "duration_seconds": body.duration_seconds,
+    }
+    database.db_config_set("pledge_config", json.dumps(_pledge_config))
+    await manager.broadcast({"event": "pledge_config", "config": _pledge_config})
+    return JSONResponse(_pledge_config)
 
 
 @app.get("/admin/chief-guest-config")
@@ -253,7 +266,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         "data": [s.model_dump() for s in storage.get_all()],
     })
     await manager.send_to(ws, {"event": "display_theme", "theme": _display_theme})
-    await manager.send_to(ws, {"event": "pledge_update", "text": _pledge_text})
+    await manager.send_to(ws, {"event": "pledge_config", "config": _pledge_config})
     await manager.send_to(ws, {"event": "cg_config", "config": _cg_config})
     try:
         while True:
@@ -263,7 +276,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
 
 # Serve built frontend.
-_static_dir = Path(__file__).parent.parent / "frontend" / "dist"
+_static_dir = FRONTEND_DIST
 if _static_dir.exists():
     _assets_dir = _static_dir / "assets"
     if _assets_dir.is_dir():

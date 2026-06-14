@@ -55,7 +55,7 @@ export function InputPage(): React.ReactElement {
         <img src="/nlclogo70th.png" alt="NLC 70th Anniversary" className="nlc-logo" />
         <div className="event-badge">NLC Neyveli Book Fair</div>
         <h1 className="input-title">Live Sign Wall</h1>
-        <p className="input-sub">Sign your name and appear on the big screen!</p>
+        <p className="input-sub">Write anything and appear on the big screen!</p>
       </header>
 
       <main className="input-form">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTheme } from "../hooks/useTheme";
-import { DisplayTheme, ChiefGuestConfig } from "../types";
+import { DisplayTheme, ChiefGuestConfig, PledgeConfig } from "../types";
 
 const DISPLAY_THEMES: { id: DisplayTheme; label: string; emoji: string }[] = [
   { id: "sky",    label: "Sky",    emoji: "🌤" },
@@ -166,8 +166,13 @@ export function AdminPage(): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
 
-  // Pledge state
-  const [pledgeText, setPledgeText] = useState("");
+  // Pledge state — three languages (Tamil/Hindi/English) + one shared per-language duration
+  const [pledge, setPledge] = useState<PledgeConfig>({
+    tamil: "",
+    hindi: "",
+    english: "",
+    duration_seconds: 90,
+  });
   const [pledgeSaving, setPledgeSaving] = useState(false);
   const [pledgeMsg, setPledgeMsg] = useState("");
 
@@ -222,9 +227,18 @@ export function AdminPage(): React.ReactElement {
       .then((r) => r.json())
       .then((d) => { if (d.theme) setDisplayThemeState(d.theme); })
       .catch(() => {});
-    fetch("/admin/pledge")
+    fetch("/admin/pledge-config")
       .then((r) => r.json())
-      .then((d) => { if (d.text !== undefined) setPledgeText(d.text); })
+      .then((d: PledgeConfig) => {
+        if (d && typeof d === "object") {
+          setPledge({
+            tamil: d.tamil ?? "",
+            hindi: d.hindi ?? "",
+            english: d.english ?? "",
+            duration_seconds: d.duration_seconds ?? 90,
+          });
+        }
+      })
       .catch(() => {});
     fetch("/admin/chief-guest-config")
       .then((r) => r.json())
@@ -254,12 +268,14 @@ export function AdminPage(): React.ReactElement {
   const handleSavePledge = async () => {
     setPledgeSaving(true);
     try {
-      const res = await fetch("/admin/pledge", {
+      const res = await fetch("/admin/pledge-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: pledgeText }),
+        body: JSON.stringify(pledge),
       });
       if (res.ok) {
+        const saved: PledgeConfig = await res.json();
+        setPledge(saved);
         setPledgeMsg("Pledge saved and broadcast to display wall.");
       } else {
         setPledgeMsg("Failed to save pledge.");
@@ -534,6 +550,8 @@ export function AdminPage(): React.ReactElement {
 
   return (
     <div className="admin-page">
+
+      {/* ── Header ── */}
       <header className="admin-header">
         <img src="/nlclogo70th.png" alt="NLC" className="admin-logo" />
         <div>
@@ -545,27 +563,55 @@ export function AdminPage(): React.ReactElement {
 
       <div className="admin-grid">
 
-        {/* Settings card */}
+        {/* ── Overview: stats + quick nav — full width ── */}
+        <div className="admin-card admin-card--overview">
+          <div className="overview-stats">
+            <div className="overview-stat">
+              <div className="overview-stat-value">{stats?.audience_count ?? "—"}</div>
+              <div className="overview-stat-label">Audience</div>
+            </div>
+            <div className="overview-divider" />
+            <div className="overview-stat">
+              <div className="overview-stat-value overview-stat-value--gold">{stats?.cg_count ?? "—"}</div>
+              <div className="overview-stat-label">Chief Guests</div>
+            </div>
+            <div className="overview-divider" />
+            <div className="overview-stat">
+              <div className="overview-stat-value">{stats?.count ?? "—"}</div>
+              <div className="overview-stat-label">Total Signed</div>
+            </div>
+            <div className="overview-divider" />
+            <div className="overview-stat">
+              <div className={`overview-live-dot${stats ? " online" : ""}`} />
+              <div className="overview-stat-label">{stats ? "Server Live" : "Connecting…"}</div>
+            </div>
+          </div>
+          <div className="overview-nav">
+            <a href="/" className="overview-nav-btn">✦ Input Page</a>
+            <a href="/display" className="overview-nav-btn overview-nav-btn--primary">📺 Display Wall</a>
+          </div>
+        </div>
+
+        {/* ── Settings ── */}
         <div className="admin-card">
           <div className="admin-card-title">⚙ Settings</div>
 
-          <div className="admin-row" style={{ marginBottom: 16 }}>
-            <div className="admin-row-label">
-              <span className="admin-row-icon">{theme === "dark" ? "🌙" : "☀️"}</span>
-              Input Page Theme
-            </div>
+          <div className="settings-section">
+            <div className="settings-label">Input Page Theme</div>
             <div className="theme-toggle-group">
-              <button className={`theme-btn${theme === "dark" ? " active" : ""}`} onClick={() => setTheme("dark")}>Dark</button>
-              <button className={`theme-btn${theme === "light" ? " active" : ""}`} onClick={() => setTheme("light")}>Light</button>
+              <button className={`theme-btn${theme === "dark" ? " active" : ""}`} onClick={() => setTheme("dark")}>🌙 Dark</button>
+              <button className={`theme-btn${theme === "light" ? " active" : ""}`} onClick={() => setTheme("light")}>☀️ Light</button>
             </div>
           </div>
 
-          <div className="admin-row">
-            <div className="admin-row-label">
-              <span className="admin-row-icon">
-                {DISPLAY_THEMES.find((t) => t.id === displayTheme)?.emoji ?? "🌤"}
-              </span>
+          <div className="settings-divider" />
+
+          <div className="settings-section">
+            <div className="settings-label">
               Display Wall Theme
+              <span className="settings-label-active">
+                {DISPLAY_THEMES.find((t) => t.id === displayTheme)?.emoji} {DISPLAY_THEMES.find((t) => t.id === displayTheme)?.label}
+              </span>
             </div>
             <div className="theme-toggle-group theme-toggle-wrap">
               {DISPLAY_THEMES.map((t) => (
@@ -581,97 +627,23 @@ export function AdminPage(): React.ReactElement {
           </div>
         </div>
 
-        {/* Stats card */}
+        {/* ── Chief Guest ── */}
         <div className="admin-card">
-          <div className="admin-card-title">📊 Live Stats</div>
-          <div className="admin-stat-grid">
-            <div className="admin-stat">
-              <div className="admin-stat-value">{stats?.audience_count ?? "—"}</div>
-              <div className="admin-stat-label">Audience Signatures</div>
-            </div>
-            <div className="admin-stat">
-              <div className="admin-stat-value" style={{ color: "var(--gold-light)" }}>{stats?.cg_count ?? "—"}</div>
-              <div className="admin-stat-label">Chief Guests</div>
-            </div>
-            <div className="admin-stat">
-              <div className="admin-stat-value">{stats?.count ?? "—"}</div>
-              <div className="admin-stat-label">Total Signatures</div>
-            </div>
-            <div className="admin-stat">
-              <div className="admin-stat-value" style={{ color: "var(--cyan)" }}>
-                {stats ? "●" : "○"}
-              </div>
-              <div className="admin-stat-label">{stats ? "Server Online" : "Connecting…"}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Pledge content card — full-width */}
-        <div className="admin-card pledge-card">
-          <div className="pledge-card-header">
-            <div className="admin-card-title" style={{ marginBottom: 0 }}>📜 Pledge Content</div>
-            <span className="pledge-header-hint">Displays on the sign wall in real-time</span>
-          </div>
-
-          <div className="pledge-field">
-            <textarea
-              className="pledge-textarea"
-              value={pledgeText}
-              onChange={(e) => setPledgeText(e.target.value)}
-              placeholder="Enter the pledge text visitors will see on the display wall…"
-              maxLength={2000}
-              rows={5}
-            />
-            <div className="pledge-action-row">
-              <span className="pledge-char-count">{pledgeText.length} / 2000</span>
-              <div className="pledge-action-btns">
-                {pledgeText.length > 0 && (
-                  <button
-                    className="btn-pledge-clear"
-                    onClick={() => setPledgeText("")}
-                    title="Clear text (you still need to Save to remove from display)"
-                  >
-                    ✕ Clear
-                  </button>
-                )}
-                <button
-                  className="btn-pledge-save"
-                  onClick={handleSavePledge}
-                  disabled={pledgeSaving}
-                >
-                  {pledgeSaving ? "Broadcasting…" : "💾 Save & Broadcast"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {pledgeMsg && (
-            <div className="admin-feedback admin-feedback-info pledge-feedback">
-              {pledgeMsg}
-            </div>
-          )}
-        </div>
-
-        {/* Chief Guest config card */}
-        <div className="admin-card">
-          <div className="admin-card-title">★ Chief Guest Display</div>
+          <div className="admin-card-title">★ Chief Guest</div>
           <div className="cg-config-section">
-            <div className="cg-toggle-row">
-              <span className="admin-row-label">Show Chief Guest Signatures</span>
+
+            <div className="settings-section">
+              <div className="settings-label">Show on Display Wall</div>
               <div className="theme-toggle-group">
-                <button
-                  className={`theme-btn${cgConfig.enabled ? " active" : ""}`}
-                  onClick={() => setCgConfig((c) => ({ ...c, enabled: true }))}
-                >On</button>
-                <button
-                  className={`theme-btn${!cgConfig.enabled ? " active" : ""}`}
-                  onClick={() => setCgConfig((c) => ({ ...c, enabled: false }))}
-                >Off</button>
+                <button className={`theme-btn${cgConfig.enabled ? " active" : ""}`} onClick={() => setCgConfig((c) => ({ ...c, enabled: true }))}>On</button>
+                <button className={`theme-btn${!cgConfig.enabled ? " active" : ""}`} onClick={() => setCgConfig((c) => ({ ...c, enabled: false }))}>Off</button>
               </div>
             </div>
 
-            <div className="cg-retention-row">
-              <span className="cg-field-label">Retention Duration</span>
+            <div className="settings-divider" />
+
+            <div className="settings-section">
+              <div className="settings-label">Retention</div>
               <div className="theme-toggle-group">
                 <button
                   className={`theme-btn${cgConfig.retention_mode === "forever" ? " active" : ""}`}
@@ -680,13 +652,13 @@ export function AdminPage(): React.ReactElement {
                 <button
                   className={`theme-btn${cgConfig.retention_mode === "until_datetime" ? " active" : ""}`}
                   onClick={() => setCgConfig((c) => ({ ...c, retention_mode: "until_datetime" }))}
-                >Until Date/Time</button>
+                >Until Date</button>
               </div>
             </div>
 
             {cgConfig.retention_mode === "until_datetime" && (
-              <div className="cg-date-row">
-                <span className="cg-field-label">Expires At</span>
+              <div className="cg-date-row" style={{ marginTop: 4 }}>
+                <span className="cg-field-label">Expires at</span>
                 <input
                   type="datetime-local"
                   className="cg-date-input"
@@ -696,81 +668,131 @@ export function AdminPage(): React.ReactElement {
               </div>
             )}
 
-            <button
-              className="btn-export"
-              style={{ marginTop: 8 }}
-              onClick={handleSaveCgConfig}
-              disabled={cgSaving}
-            >
-              {cgSaving ? "Saving…" : "💾 Save Chief Guest Config"}
+            <button className="btn-pledge-save" style={{ marginTop: 8, width: "100%" }} onClick={handleSaveCgConfig} disabled={cgSaving}>
+              {cgSaving ? "Saving…" : "💾 Save Config"}
             </button>
-            {cgMsg && <div className="admin-feedback admin-feedback-info">{cgMsg}</div>}
+            {cgMsg && <div className="admin-feedback admin-feedback-info" style={{ marginTop: 10 }}>{cgMsg}</div>}
           </div>
         </div>
 
-        {/* Export card */}
+        {/* ── Pledge Content — full width ── */}
+        <div className="admin-card pledge-card">
+          <div className="pledge-card-header">
+            <div className="admin-card-title" style={{ marginBottom: 0 }}>📜 Pledge Content</div>
+            <span className="pledge-header-hint">Rotates: Tamil → Hindi → English</span>
+          </div>
+
+          <div className="pledge-duration-row">
+            <label className="pledge-duration-label" htmlFor="pledge-duration">⏱ Time per language</label>
+            <div className="pledge-duration-input-wrap">
+              <input
+                id="pledge-duration"
+                type="number"
+                className="pledge-duration-input"
+                min={5}
+                max={600}
+                value={pledge.duration_seconds}
+                onChange={(e) => setPledge((p) => ({ ...p, duration_seconds: Number(e.target.value) || 0 }))}
+              />
+              <span className="pledge-duration-unit">seconds</span>
+            </div>
+          </div>
+
+          <div className="pledge-langs-grid">
+            {(
+              [
+                { key: "tamil",   label: "Tamil — தமிழ்" },
+                { key: "hindi",   label: "Hindi — हिन्दी" },
+                { key: "english", label: "English" },
+              ] as { key: "tamil" | "hindi" | "english"; label: string }[]
+            ).map(({ key, label }) => (
+              <div className="pledge-lang-block" key={key}>
+                <div className="pledge-lang-label">{label}</div>
+                <div className="pledge-field">
+                  <textarea
+                    className="pledge-textarea"
+                    value={pledge[key]}
+                    onChange={(e) => setPledge((p) => ({ ...p, [key]: e.target.value }))}
+                    placeholder={`Enter ${key} pledge…`}
+                    maxLength={4000}
+                    rows={5}
+                  />
+                  <div className="pledge-action-row">
+                    <span className="pledge-char-count">{pledge[key].length} / 4000</span>
+                    {pledge[key].length > 0 && (
+                      <button className="btn-pledge-clear" onClick={() => setPledge((p) => ({ ...p, [key]: "" }))}>✕ Clear</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="pledge-save-row">
+            <button className="btn-pledge-save" onClick={handleSavePledge} disabled={pledgeSaving}>
+              {pledgeSaving ? "Broadcasting…" : "💾 Save & Broadcast"}
+            </button>
+          </div>
+          {pledgeMsg && <div className="admin-feedback admin-feedback-info pledge-feedback">{pledgeMsg}</div>}
+        </div>
+
+        {/* ── Export ── */}
         <div className="admin-card">
           <div className="admin-card-title">💾 Export Data</div>
           <div className="admin-export-stack">
             <button className="btn-export" onClick={handleExportJSON}>
-              📥 Download All as JSON
+              📥 All Signatures — JSON
             </button>
             <button className="btn-export" onClick={handleDownloadAudienceSheet}>
-              🖼 Download Audience Sheet (PNG, max 100/page)
+              🖼 Audience Sheet — PNG
             </button>
             <button className="btn-export" onClick={handleDownloadCgSheet}>
-              ★ Download Chief Guest Sheet (PNG)
+              ★ Chief Guest Sheet — PNG
             </button>
             <button className="btn-export btn-export-server" onClick={handleSaveImages} disabled={saving}>
-              💿 {saving ? "Saving…" : "Save Signature Images to Server"}
+              💿 {saving ? "Saving to server…" : "Save Images to Server"}
             </button>
           </div>
-          {exportMsg && <div className="admin-feedback admin-feedback-info">{exportMsg}</div>}
+          {exportMsg && <div className="admin-feedback admin-feedback-info" style={{ marginTop: 12 }}>{exportMsg}</div>}
         </div>
 
-        {/* Actions card */}
-        <div className="admin-card">
-          <div className="admin-card-title">🗑 Actions</div>
-          <p className="admin-action-desc">
-            Clear audience signatures from the wall. Chief Guest signatures are preserved.
-          </p>
-          <button className="btn-danger" onClick={handleClear} disabled={clearing} style={{ marginBottom: 10 }}>
-            {clearing ? "Clearing…" : "Clear Audience Signatures"}
-          </button>
-          {clearMsg && <div className="admin-feedback">{clearMsg}</div>}
+        {/* ── Danger Zone ── */}
+        <div className="admin-card admin-card--danger">
+          <div className="admin-card-title danger-zone-title">⚠ Danger Zone</div>
 
-          <p className="admin-action-desc" style={{ marginTop: 14 }}>
-            Clear Chief Guest signatures from the wall and database.
-          </p>
-          <button className="btn-danger" onClick={handleClearCg} disabled={clearingCg}>
-            {clearingCg ? "Clearing…" : "Clear Chief Guest Signatures"}
-          </button>
-          {clearCgMsg && <div className="admin-feedback">{clearCgMsg}</div>}
-        </div>
-
-        {/* Navigation card */}
-        <div className="admin-card">
-          <div className="admin-card-title">🔗 Navigation</div>
-          <div className="admin-nav-links">
-            <a href="/" className="admin-nav-btn">✦ Visitor Input Page</a>
-            <a href="/display" className="admin-nav-btn">📺 Display Wall</a>
+          <div className="danger-action">
+            <div className="danger-action-info">
+              <div className="danger-action-name">Clear Audience Wall</div>
+              <div className="danger-action-desc">Removes all audience signatures. Chief Guest signatures are kept.</div>
+            </div>
+            <button className="btn-danger btn-danger--compact" onClick={handleClear} disabled={clearing}>
+              {clearing ? "Clearing…" : "Clear"}
+            </button>
           </div>
+          {clearMsg && <div className="admin-feedback" style={{ marginBottom: 12 }}>{clearMsg}</div>}
+
+          <div className="danger-divider" />
+
+          <div className="danger-action">
+            <div className="danger-action-info">
+              <div className="danger-action-name">Clear Chief Guests</div>
+              <div className="danger-action-desc">Removes all Chief Guest signatures from wall and database.</div>
+            </div>
+            <button className="btn-danger btn-danger--compact" onClick={handleClearCg} disabled={clearingCg}>
+              {clearingCg ? "Clearing…" : "Clear"}
+            </button>
+          </div>
+          {clearCgMsg && <div className="admin-feedback">{clearCgMsg}</div>}
         </div>
 
       </div>
 
-      {/* Full-width DB table */}
+      {/* ── Signatures Database — full width ── */}
       <div className="admin-db-section">
         <div className="admin-db-header">
           <div className="admin-db-title">🗄 Signatures Database</div>
-          <div className="admin-db-meta">
-            {dbTotal} record{dbTotal !== 1 ? "s" : ""} total
-          </div>
-          <button
-            className="btn-db-refresh"
-            onClick={() => fetchDbRows(dbPage)}
-            disabled={dbLoading}
-          >
+          <div className="admin-db-meta">{dbTotal} record{dbTotal !== 1 ? "s" : ""}</div>
+          <button className="btn-db-refresh" onClick={() => fetchDbRows(dbPage)} disabled={dbLoading}>
             {dbLoading ? "Loading…" : "↻ Refresh"}
           </button>
         </div>
@@ -791,9 +813,7 @@ export function AdminPage(): React.ReactElement {
             </thead>
             <tbody>
               {dbRows.length === 0 && !dbLoading && (
-                <tr>
-                  <td colSpan={6} className="db-empty">No signatures in database yet.</td>
-                </tr>
+                <tr><td colSpan={6} className="db-empty">No signatures in database yet.</td></tr>
               )}
               {dbRows.map((row, idx) => {
                 const rowNum = dbPage * PAGE_SIZE + idx + 1;
@@ -804,10 +824,7 @@ export function AdminPage(): React.ReactElement {
                 const isDeleting = deletingId === row.id;
 
                 return (
-                  <tr
-                    key={row.id}
-                    className={`${isDeleting ? "row-deleting" : ""} ${row.is_chief_guest ? "row-cg" : ""}`}
-                  >
+                  <tr key={row.id} className={`${isDeleting ? "row-deleting" : ""} ${row.is_chief_guest ? "row-cg" : ""}`}>
                     <td className="col-num">{rowNum}</td>
                     <td className="col-name">
                       {isEditing ? (
@@ -840,45 +857,22 @@ export function AdminPage(): React.ReactElement {
                       </span>
                     </td>
                     <td className="col-cg">
-                      <span className={`db-cg-badge ${row.is_chief_guest ? "is-cg" : "not-cg"}`}>
-                        ★
-                      </span>
+                      <span className={`db-cg-badge ${row.is_chief_guest ? "is-cg" : "not-cg"}`}>★</span>
                     </td>
                     <td className="col-actions">
                       <div className="db-action-btns">
                         {!isEditing && (
-                          <button
-                            className="btn-db-edit"
-                            title="Edit name"
-                            onClick={() => handleEditStart(row)}
-                          >
-                            ✏
-                          </button>
+                          <button className="btn-db-edit" title="Edit name" onClick={() => handleEditStart(row)}>✏</button>
                         )}
                         {row.has_sig && (
-                          <button
-                            className="btn-db-dl"
-                            title="Download signature image"
-                            onClick={() => handleDownloadImage(row)}
-                          >
-                            ⬇
-                          </button>
+                          <button className="btn-db-dl" title="Download signature image" onClick={() => handleDownloadImage(row)}>⬇</button>
                         )}
                         <button
                           className={`btn-db-cg${row.is_chief_guest ? " active" : ""}`}
                           title={row.is_chief_guest ? "Unmark as Chief Guest" : "Mark as Chief Guest"}
                           onClick={() => handleToggleCg(row)}
-                        >
-                          ★
-                        </button>
-                        <button
-                          className="btn-db-del"
-                          title="Delete"
-                          disabled={isDeleting}
-                          onClick={() => handleDbDelete(row)}
-                        >
-                          🗑
-                        </button>
+                        >★</button>
+                        <button className="btn-db-del" title="Delete" disabled={isDeleting} onClick={() => handleDbDelete(row)}>🗑</button>
                       </div>
                     </td>
                   </tr>
@@ -890,21 +884,9 @@ export function AdminPage(): React.ReactElement {
 
         {totalPages > 1 && (
           <div className="admin-db-pagination">
-            <button
-              className="btn-db-page"
-              disabled={dbPage === 0}
-              onClick={() => handleDbPageChange(dbPage - 1)}
-            >
-              ← Prev
-            </button>
+            <button className="btn-db-page" disabled={dbPage === 0} onClick={() => handleDbPageChange(dbPage - 1)}>← Prev</button>
             <span className="db-page-info">Page {dbPage + 1} of {totalPages}</span>
-            <button
-              className="btn-db-page"
-              disabled={dbPage >= totalPages - 1}
-              onClick={() => handleDbPageChange(dbPage + 1)}
-            >
-              Next →
-            </button>
+            <button className="btn-db-page" disabled={dbPage >= totalPages - 1} onClick={() => handleDbPageChange(dbPage + 1)}>Next →</button>
           </div>
         )}
       </div>

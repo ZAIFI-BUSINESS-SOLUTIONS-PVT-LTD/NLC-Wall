@@ -6,6 +6,7 @@ import datetime
 import logging
 from pathlib import Path
 import database
+from paths import SIGNATURES_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +14,6 @@ MAX_SIGNATURES = 500
 
 _store: List[Signature] = []
 _lock = threading.Lock()
-
-SIGNATURES_DIR = Path(__file__).parent.parent / "signatures"
 
 # Init DB and restore in-memory store from persisted records
 database.init_db()

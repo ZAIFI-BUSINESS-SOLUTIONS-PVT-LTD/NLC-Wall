@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from models import Signature
-
-DB_PATH = Path(__file__).parent.parent / "signwall.db"
+from paths import DB_PATH
 
 _lock = threading.Lock()
 

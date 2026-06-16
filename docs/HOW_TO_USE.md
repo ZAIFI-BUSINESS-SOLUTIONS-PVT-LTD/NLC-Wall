@@ -11,13 +11,12 @@ Runs entirely on local Wi-Fi. No internet required.
 
 **Backend (Python):**
 ```powershell
-cd f:\07_signboard\backend
+cd backend
 pip install -r requirements.txt
 ```
 
 **Frontend (build once, or after code changes):**
 ```powershell
-cd f:\07_signboard
 build_frontend.bat
 ```
 

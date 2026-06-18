@@ -29,6 +29,7 @@ describe("InputPage", () => {
     expect(screen.getByText("Live Sign Wall")).toBeInTheDocument();
     expect(screen.getByText("NLC Neyveli Book Fair")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Submit to Wall/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /View Display Wall/i })).toBeNull();
   });
 
   it("disables submit until a name is entered", async () => {
@@ -62,6 +63,22 @@ describe("InputPage", () => {
     expect(await screen.findByText("You're on the wall!")).toBeInTheDocument();
     expect(screen.getByText("Rishi")).toBeInTheDocument();
     expect(screen.getByText(/Look at the display wall/)).toBeInTheDocument();
+  });
+
+  it("submits when Enter is pressed in the typing field", async () => {
+    const fetchMock = mockFetchOk({ id: "abc", timestamp: 123 });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<InputPage />);
+
+    await user.type(screen.getByRole("textbox"), "Tablet user{Enter}");
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/submit",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.name).toBe("Tablet user");
   });
 
   it("surfaces the server error detail on a rejected submission", async () => {

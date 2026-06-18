@@ -116,6 +116,14 @@ class TestImageDownload:
         assert "attachment" in r.headers["content-disposition"]
         assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
 
+    def test_download_filename_sanitizes_unsafe_name_characters(self, client, make_signature, png_data_url):
+        sig = make_signature(name='A/B:C*"D', signature=png_data_url)
+        storage.add(sig)
+        r = client.get(f"/admin/db/signatures/{sig.id}/image")
+
+        assert r.status_code == 200
+        assert 'filename="A_B_C__D_' in r.headers["content-disposition"]
+
     def test_no_signature_404(self, client, make_signature):
         sig = make_signature(name="NoSig", signature=None)
         storage.add(sig)

@@ -44,10 +44,10 @@ describe("DisplayPage", () => {
     expect(screen.getByText(/signed the wall/)).toBeInTheDocument();
   });
 
-  it("does not show the Chief Guest banner when there are none", () => {
+  it("does not show chief-guest names when there are none", () => {
     render(<DisplayPage />);
     send({ event: "init", data: [] });
-    expect(screen.queryByText("★ Chief Guest")).toBeNull();
+    expect(screen.queryByText("VIP Guest")).toBeNull();
   });
 
   it("shows the Chief Guest banner with names from the init payload", () => {
@@ -59,7 +59,6 @@ describe("DisplayPage", () => {
         { id: "2", name: "VIP Guest", signature: null, timestamp: 2, is_chief_guest: true },
       ],
     });
-    expect(screen.getByText("★ Chief Guest")).toBeInTheDocument();
     expect(screen.getByText("VIP Guest")).toBeInTheDocument();
   });
 
@@ -81,9 +80,9 @@ describe("DisplayPage", () => {
         { id: "2", name: "VIP Guest", signature: null, timestamp: 2, is_chief_guest: true },
       ],
     });
-    expect(screen.getByText("★ Chief Guest")).toBeInTheDocument();
+    expect(screen.getByText("VIP Guest")).toBeInTheDocument();
     send({ event: "clear_chief_guests" });
-    expect(screen.queryByText("★ Chief Guest")).toBeNull();
+    expect(screen.queryByText("VIP Guest")).toBeNull();
   });
 
   it("adds a newly broadcast audience signature to state", () => {
@@ -95,5 +94,58 @@ describe("DisplayPage", () => {
     });
     // No throw and the page is still mounted with its HUD.
     expect(screen.getByText(/signed the wall/)).toBeInTheDocument();
+  });
+
+  it("updates a signature when an update_signature event arrives", () => {
+    render(<DisplayPage />);
+    send({
+      event: "init",
+      data: [
+        { id: "7", name: "Guest", signature: null, timestamp: 7, is_chief_guest: false },
+      ],
+    });
+
+    send({
+      event: "update_signature",
+      data: { id: "7", name: "Guest", signature: null, timestamp: 7, is_chief_guest: true },
+    });
+
+    expect(screen.getByText("Guest")).toBeInTheDocument();
+  });
+
+  it("removes a chief guest when remove_signature arrives", () => {
+    render(<DisplayPage />);
+    send({
+      event: "init",
+      data: [
+        { id: "2", name: "VIP Guest", signature: null, timestamp: 2, is_chief_guest: true },
+      ],
+    });
+    expect(screen.getByText("VIP Guest")).toBeInTheDocument();
+
+    send({ event: "remove_signature", id: "2" });
+
+    expect(screen.queryByText("VIP Guest")).toBeNull();
+  });
+
+  it("keeps chief guests when the audience clear event arrives", () => {
+    render(<DisplayPage />);
+    send({
+      event: "init",
+      data: [
+        { id: "1", name: "Audience Aaa", signature: null, timestamp: 1, is_chief_guest: false },
+        { id: "2", name: "VIP Guest", signature: null, timestamp: 2, is_chief_guest: true },
+      ],
+    });
+
+    send({ event: "clear" });
+
+    expect(screen.getByText("VIP Guest")).toBeInTheDocument();
+  });
+
+  it("shows the admin gear only when the display URL includes admin", () => {
+    window.history.pushState({}, "", "/display?admin=1");
+    render(<DisplayPage />);
+    expect(screen.getByTitle("Admin")).toHaveAttribute("href", "/admin");
   });
 });

@@ -24,6 +24,21 @@ function routedFetch() {
   });
 }
 
+function routedFetchWithRows(rows: unknown[], total = rows.length) {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/health")) return jsonResp(HEALTH);
+    if (url.includes("/admin/display-theme")) return jsonResp({ theme: "sky" });
+    if (url.includes("/admin/pledge-config")) return jsonResp(PLEDGE);
+    if (url.includes("/admin/chief-guest-config")) return jsonResp(CG);
+    if (url.includes("/admin/db/signatures") && init?.method === "PUT") return jsonResp({ status: "updated" });
+    if (url.includes("/admin/db/signatures") && init?.method === "DELETE") return jsonResp({ status: "deleted" });
+    if (url.includes("/admin/db/signatures")) return jsonResp({ total, items: rows });
+    if (url.includes("/admin/signatures")) return jsonResp({ status: "cleared" });
+    return jsonResp({});
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", routedFetch());
   vi.stubGlobal("confirm", vi.fn(() => true));
@@ -104,5 +119,57 @@ describe("AdminPage", () => {
     for (const label of ["Sky", "Space", "Aurora", "Ocean", "Neon", "Forest", "Sunset"]) {
       expect(await screen.findByRole("button", { name: new RegExp(label) })).toBeInTheDocument();
     }
+  });
+
+  it("edits a database row name and posts the trimmed value", async () => {
+    const row = { id: "sig-1", name: "Before", timestamp: 1, has_sig: false, is_chief_guest: false };
+    const fetchMock = routedFetchWithRows([row]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<AdminPage />);
+
+    await screen.findByText("Before");
+    await user.click(screen.getByTitle("Edit name"));
+    const input = screen.getByDisplayValue("Before");
+    await user.clear(input);
+    await user.type(input, "  After  ");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.getByText("Name updated.")).toBeInTheDocument());
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith("/admin/db/signatures/sig-1"));
+    expect(call?.[1]).toEqual(expect.objectContaining({ method: "PUT" }));
+    expect(JSON.parse((call?.[1] as RequestInit).body as string)).toEqual({ name: "After" });
+  });
+
+  it("toggles chief-guest status from the database table", async () => {
+    const row = { id: "sig-2", name: "Guest", timestamp: 1, has_sig: false, is_chief_guest: false };
+    const fetchMock = routedFetchWithRows([row]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<AdminPage />);
+
+    await screen.findByText("Guest");
+    await user.click(screen.getByTitle("Mark as Chief Guest"));
+
+    await waitFor(() => expect(screen.getByText('"Guest" marked as Chief Guest.')).toBeInTheDocument());
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith("/admin/db/signatures/sig-2/chief-guest"));
+    expect(call?.[1]).toEqual(expect.objectContaining({ method: "PUT" }));
+    expect(JSON.parse((call?.[1] as RequestInit).body as string)).toEqual({ is_chief_guest: true });
+  });
+
+  it("does not clear audience signatures when confirmation is cancelled", async () => {
+    const fetchMock = routedFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("confirm", vi.fn(() => false));
+    const user = userEvent.setup();
+    render(<AdminPage />);
+
+    const clearButtons = await screen.findAllByRole("button", { name: "Clear" });
+    await user.click(clearButtons[0]);
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/admin/signatures",
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 });

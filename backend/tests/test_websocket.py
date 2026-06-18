@@ -2,10 +2,18 @@
 receives on connect, and every server-side broadcast the display wall relies on
 to stay in sync (new/remove/update signature, clears, theme & config pushes)."""
 
+import pytest
+
 import storage
+from websocket import ConnectionManager
 
 
 INIT_EVENTS = ["init", "display_theme", "pledge_config", "cg_config"]
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
 
 
 def drain_init(ws):
@@ -131,3 +139,44 @@ class TestMultipleClients:
             m2 = ws2.receive_json()
         assert m1["event"] == "new_signature" == m2["event"]
         assert m1["data"]["name"] == "Everyone" == m2["data"]["name"]
+
+
+class DummyWebSocket:
+    def __init__(self, fail=False):
+        self.fail = fail
+        self.accepted = False
+        self.sent = []
+
+    async def accept(self):
+        self.accepted = True
+
+    async def send_text(self, payload):
+        if self.fail:
+            raise RuntimeError("closed")
+        self.sent.append(payload)
+
+
+class TestConnectionManagerCleanup:
+    @pytest.mark.anyio
+    async def test_broadcast_removes_dead_connections(self):
+        manager = ConnectionManager()
+        alive = DummyWebSocket()
+        dead = DummyWebSocket(fail=True)
+        await manager.connect(alive)
+        await manager.connect(dead)
+
+        await manager.broadcast({"event": "ping"})
+
+        assert len(manager._active) == 1
+        assert manager._active[0] is alive
+        assert alive.sent
+
+    @pytest.mark.anyio
+    async def test_send_to_dead_connection_is_safe(self):
+        manager = ConnectionManager()
+        dead = DummyWebSocket(fail=True)
+        await manager.connect(dead)
+
+        await manager.send_to(dead, {"event": "ping"})
+
+        assert manager._active == []

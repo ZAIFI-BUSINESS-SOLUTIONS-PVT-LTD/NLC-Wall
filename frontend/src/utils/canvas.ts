@@ -62,7 +62,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
   ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
   const padX = 16;
   const padY = 10;
-  const sigH = sig.signature ? 48 : 0;
+  const sigH = sig.signature ? 56 : 0;
   const MAX_TEXT_W = 560; // cap so no card ever exceeds ~600px wide
   let displayName = sig.name;
   let textW = ctx.measureText(displayName).width;
@@ -133,7 +133,15 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
   ctx.fillText(displayName, 0, sig.signature ? -sigH / 2 : 0);
 
   if (sig.signature) {
-    drawSignatureImage(ctx, sig.signature, 0, fontSize / 2 + padY / 2, boxW - 16, sigH - 6, cardStyle.useInvertedSignature);
+    // Clip to card interior so signature never bleeds outside the box
+    ctx.save();
+    cardPath(ctx, -boxW / 2 + 2, -boxH / 2 + 2, boxW - 4, boxH - 4, shapeIdx);
+    ctx.clip();
+    // cy: just below the name text; maxH: remaining space to card bottom minus padding
+    const sigCy = -sigH / 2 + fontSize + padY / 2;
+    const sigMaxH = boxH / 2 - sigCy - padY;
+    drawSignatureImage(ctx, sig.signature, 0, sigCy, boxW - 16, sigMaxH, cardStyle.useInvertedSignature);
+    ctx.restore();
   }
 
   ctx.restore();

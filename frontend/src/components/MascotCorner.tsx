@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence, useAnimation } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 /**
  * MascotCorner — cinematic news-ticker style mascot.
@@ -10,8 +10,8 @@ import { motion, AnimatePresence, useAnimation } from "framer-motion";
  *   waves goodbye and slides out → repeat
  */
 
-const HIDDEN_MS  = 14_000;
-const VISIBLE_MS =  7_000;
+const HIDDEN_MS  =  4_000;
+const VISIBLE_MS = 12_000;
 
 // Sparkle positions (relative to mascot container)
 const SPARKLES = [
@@ -64,7 +64,6 @@ function Sparkle({ x, y, size, delay }: { x: number; y: number; size: number; de
 export function MascotCorner() {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const controls = useAnimation();
 
   useEffect(() => {
     let cancelled = false;
@@ -180,7 +179,7 @@ export function MascotCorner() {
 
               {/* Mascot image with idle tilt */}
               <motion.img
-                src="/Mascot.webp"
+                src="/assets/Mascot.webp"
                 alt="Neyon the NLC mascot"
                 animate={
                   leaving

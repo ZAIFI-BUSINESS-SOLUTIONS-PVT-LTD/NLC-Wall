@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState } from "react";
+import SignaturePad from "signature_pad";
 
 interface Props {
   onExport: (dataUrl: string | null) => void;
@@ -7,133 +8,118 @@ interface Props {
 }
 
 export function SignatureCanvas({ onExport, disabled, resetToken }: Props): React.ReactElement {
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const prevRef    = useRef<[number, number] | null>(null);
-  const drawing    = useRef(false);
-  const historyRef = useRef<ImageData[]>([]);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const padRef      = useRef<SignaturePad | null>(null);
+  // Stable ref so event handlers always call the latest onExport without
+  // triggering effect re-runs (which would destroy/recreate the pad).
+  const onExportRef = useRef(onExport);
+  onExportRef.current = onExport;
+
   const [hasDrawn, setHasDrawn] = useState(false);
   const [canUndo,  setCanUndo]  = useState(false);
 
-  // Initialize canvas after mount (handles DPR scaling).
+  // Resize the canvas bitmap to match its current CSS size + DPR.
+  // Preserves existing strokes by saving/restoring pad data.
+  // Called on mount and on every ResizeObserver notification (orientation change, etc.).
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const pad    = padRef.current;
+    if (!canvas) return;
+
+    const dpr  = Math.max(window.devicePixelRatio || 1, 1);
+    const logW = canvas.offsetWidth;
+    const logH = canvas.offsetHeight;
+    if (!logW || !logH) return; // not yet laid out
+
+    const data = pad?.toData() ?? [];
+
+    canvas.width  = Math.round(logW * dpr);
+    canvas.height = Math.round(logH * dpr);
+    canvas.getContext("2d")!.scale(dpr, dpr);
+
+    // signature_pad must be told about the new size so it recalculates its
+    // internal scale; fromData() then redraws strokes at the new dimensions.
+    if (pad) {
+      pad.clear();
+      if (data.length > 0) pad.fromData(data);
+    }
+  }, []);
+
+  // Mount: create the pad and wire up a ResizeObserver.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const logW = rect.width  || canvas.width;
-    const logH = rect.height || canvas.height;
-
+    // Initial size
+    const dpr  = Math.max(window.devicePixelRatio || 1, 1);
+    const logW = canvas.offsetWidth || 560;
+    const logH = canvas.offsetHeight || 260;
     canvas.width  = Math.round(logW * dpr);
     canvas.height = Math.round(logH * dpr);
-    const ctx = canvas.getContext("2d")!;
-    ctx.scale(dpr, dpr);
-  }, []);
+    canvas.getContext("2d")!.scale(dpr, dpr);
+
+    const pad = new SignaturePad(canvas, {
+      penColor:  "#0d2060",
+      minWidth:  1.5,
+      maxWidth:  3,
+    });
+    padRef.current = pad;
+
+    const handleStroke = () => {
+      const strokes = pad.toData();
+      const has     = strokes.length > 0;
+      setHasDrawn(has);
+      setCanUndo(has);
+      onExportRef.current(pad.toDataURL("image/png"));
+    };
+    pad.addEventListener("afterUpdateStroke", handleStroke);
+
+    // ResizeObserver keeps the canvas correctly sized across orientation changes,
+    // window resizes, and any layout shifts (e.g. soft keyboard appearing).
+    const ro = new ResizeObserver(() => resizeCanvas());
+    ro.observe(canvas);
+
+    return () => {
+      pad.removeEventListener("afterUpdateStroke", handleStroke);
+      pad.off();
+      ro.disconnect();
+      padRef.current = null;
+    };
+  }, [resizeCanvas]);
+
+  // Reflect disabled prop without recreating the pad.
+  useEffect(() => {
+    const pad = padRef.current;
+    if (!pad) return;
+    if (disabled) pad.off();
+    else          pad.on();
+  }, [disabled]);
 
   const clearCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    historyRef.current = [];
+    const pad = padRef.current;
+    if (!pad) return;
+    pad.clear();
     setHasDrawn(false);
     setCanUndo(false);
-    onExport(null);
-  }, [onExport]);
+    onExportRef.current(null);
+  }, []);
 
   const undoStroke = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || historyRef.current.length === 0) return;
-    const ctx = canvas.getContext("2d")!;
-    const prev = historyRef.current.pop()!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.putImageData(prev, 0, 0);
-    const still = historyRef.current.length > 0;
+    const pad = padRef.current;
+    if (!pad) return;
+    const data = pad.toData();
+    if (data.length === 0) return;
+    data.pop();
+    pad.fromData(data);
+    const still = data.length > 0;
     setHasDrawn(still);
     setCanUndo(still);
-    onExport(still ? canvas.toDataURL("image/png") : null);
-  }, [onExport]);
+    onExportRef.current(still ? pad.toDataURL("image/png") : null);
+  }, []);
 
   useEffect(() => {
     if (resetToken !== undefined && resetToken > 0) clearCanvas();
   }, [resetToken, clearCanvas]);
-
-  const getPos = (e: MouseEvent | Touch, canvas: HTMLCanvasElement): [number, number] => {
-    const rect = canvas.getBoundingClientRect();
-    return [
-      (e.clientX - rect.left) * (canvas.width  / rect.width),
-      (e.clientY - rect.top)  * (canvas.height / rect.height),
-    ];
-  };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-
-    let exportPending = false;
-    const scheduleExport = () => {
-      if (exportPending) return;
-      exportPending = true;
-      requestAnimationFrame(() => {
-        exportPending = false;
-        onExport(canvas.toDataURL("image/png"));
-      });
-    };
-
-    const startDraw = (x: number, y: number) => {
-      if (disabled) return;
-      historyRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-      if (historyRef.current.length > 20) historyRef.current.shift();
-      drawing.current = true;
-      prevRef.current = [x, y];
-    };
-
-    const continueDraw = (x: number, y: number) => {
-      if (!drawing.current || disabled || !prevRef.current) return;
-      const [px, py] = prevRef.current;
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(x, y);
-      ctx.strokeStyle = "#0d2060";
-      ctx.lineWidth   = 3;
-      ctx.lineCap     = "round";
-      ctx.lineJoin    = "round";
-      ctx.stroke();
-      prevRef.current = [x, y];
-      setHasDrawn(true);
-      setCanUndo(true);
-      scheduleExport();
-    };
-
-    const stopDraw = () => {
-      drawing.current = false;
-      prevRef.current = null;
-    };
-
-    const onMouseDown  = (e: MouseEvent)  => startDraw(...getPos(e, canvas));
-    const onMouseMove  = (e: MouseEvent)  => continueDraw(...getPos(e, canvas));
-    const onTouchStart = (e: TouchEvent)  => { e.preventDefault(); startDraw(...getPos(e.touches[0], canvas)); };
-    const onTouchMove  = (e: TouchEvent)  => { e.preventDefault(); continueDraw(...getPos(e.touches[0], canvas)); };
-
-    canvas.addEventListener("mousedown",  onMouseDown);
-    canvas.addEventListener("mousemove",  onMouseMove);
-    canvas.addEventListener("mouseup",    stopDraw);
-    canvas.addEventListener("mouseleave", stopDraw);
-    canvas.addEventListener("touchstart", onTouchStart, { passive: false });
-    canvas.addEventListener("touchmove",  onTouchMove,  { passive: false });
-    canvas.addEventListener("touchend",   stopDraw);
-
-    return () => {
-      canvas.removeEventListener("mousedown",  onMouseDown);
-      canvas.removeEventListener("mousemove",  onMouseMove);
-      canvas.removeEventListener("mouseup",    stopDraw);
-      canvas.removeEventListener("mouseleave", stopDraw);
-      canvas.removeEventListener("touchstart", onTouchStart);
-      canvas.removeEventListener("touchmove",  onTouchMove);
-      canvas.removeEventListener("touchend",   stopDraw);
-    };
-  }, [disabled, onExport]);
 
   return (
     <div className="sig-canvas-wrap">
@@ -142,7 +128,8 @@ export function SignatureCanvas({ onExport, disabled, resetToken }: Props): Reac
         <span className="sig-optional">Optional</span>
       </div>
       <div className="sig-face-wrap">
-        <canvas ref={canvasRef} width={560} height={260} className="sig-canvas" />
+        {/* No width/height attrs — resizeCanvas sets them from offsetWidth/Height */}
+        <canvas ref={canvasRef} className="sig-canvas" />
       </div>
       {(hasDrawn || canUndo) && (
         <div className="sig-actions">

@@ -296,12 +296,4 @@ if _static_dir.exists():
     async def _admin_page() -> FileResponse:
         return FileResponse(_idx)
 
-    for _sf in _static_dir.iterdir():
-        if _sf.is_file() and _sf.suffix != ".html":
-            _sfp = str(_sf)
-            app.add_api_route(
-                f"/{_sf.name}",
-                (lambda p: lambda: FileResponse(p))(_sfp),
-                methods=["GET"],
-                include_in_schema=False,
-            )
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="spa")

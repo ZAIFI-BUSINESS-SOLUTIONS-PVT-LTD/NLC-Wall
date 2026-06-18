@@ -71,7 +71,12 @@ export function InputPage(): React.ReactElement {
           </div>
         ) : (
           <>
-            <NameInput value={name} onChange={setName} disabled={isSubmitting} />
+            <NameInput
+              value={name}
+              onChange={setName}
+              onDone={handleSubmit}
+              disabled={isSubmitting}
+            />
             <SignatureCanvas
               onExport={setSignatureData}
               disabled={isSubmitting}
@@ -93,11 +98,6 @@ export function InputPage(): React.ReactElement {
         )}
       </main>
 
-      <footer className="input-footer">
-        <a href="/display" className="display-link" target="_blank" rel="noreferrer">
-          View Display Wall →
-        </a>
-      </footer>
     </div>
   );
 }

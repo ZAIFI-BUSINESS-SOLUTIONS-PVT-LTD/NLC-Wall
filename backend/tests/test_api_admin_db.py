@@ -57,6 +57,35 @@ class TestDbListing:
 
 # ───────────────────────── update name ─────────────────────────────────
 
+class TestImportSignatures:
+    def test_imports_application_json_and_refreshes_store(self, client, make_signature, png_data_url):
+        sig = make_signature(name="Imported", signature=png_data_url, timestamp=10)
+        r = client.post("/admin/import-signatures", json=[sig.model_dump()])
+
+        assert r.status_code == 200
+        assert r.json() == {"status": "imported", "added": 1, "updated": 0, "total": 1}
+        body = client.get("/signatures").json()
+        assert [s["name"] for s in body] == ["Imported"]
+        assert body[0]["signature"] == png_data_url
+
+    def test_import_updates_existing_ids_without_duplicate_rows(self, client, make_signature):
+        sig = make_signature(name="Before", timestamp=10)
+        storage.add(sig)
+        updated = sig.model_copy(update={"name": "After", "timestamp": 20, "is_chief_guest": True})
+
+        r = client.post("/admin/import-signatures", json=[updated.model_dump()])
+
+        assert r.status_code == 200
+        assert r.json()["updated"] == 1
+        body = client.get("/signatures").json()
+        assert len(body) == 1
+        assert body[0]["name"] == "After"
+        assert body[0]["is_chief_guest"] is True
+
+    def test_import_rejects_non_application_json(self, client):
+        assert client.post("/admin/import-signatures", json={"items": []}).status_code == 422
+
+
 class TestUpdateName:
     def test_update_success(self, client, make_signature):
         sig = make_signature(name="Before")

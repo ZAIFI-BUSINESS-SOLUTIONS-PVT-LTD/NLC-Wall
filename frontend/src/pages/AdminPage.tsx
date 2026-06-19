@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { DisplayTheme, ChiefGuestConfig, PledgeConfig } from "../types";
 
@@ -155,6 +155,16 @@ function downloadCanvas(canvas: HTMLCanvasElement, filename: string): Promise<vo
   });
 }
 
+function readTextFile(file: File): Promise<string> {
+  if (typeof file.text === "function") return file.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
 export function AdminPage(): React.ReactElement {
   const [theme, setTheme] = useTheme();
   const [displayTheme, setDisplayThemeState] = useState<DisplayTheme>("sky");
@@ -164,7 +174,9 @@ export function AdminPage(): React.ReactElement {
   const [clearingCg, setClearingCg] = useState(false);
   const [clearCgMsg, setClearCgMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   // Pledge state — three languages (Tamil/Hindi/English) + one shared per-language duration
   const [pledge, setPledge] = useState<PledgeConfig>({
@@ -377,6 +389,40 @@ export function AdminPage(): React.ReactElement {
       setExportMsg("Export failed.");
     } finally {
       setTimeout(() => setExportMsg(""), 4000);
+    }
+  };
+
+  const handleImportJSON = async (file: File | null) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await readTextFile(file);
+      const data = JSON.parse(text);
+      if (!Array.isArray(data)) {
+        setExportMsg("Import failed: choose a SignWall JSON export.");
+        return;
+      }
+
+      const res = await fetch("/admin/import-signatures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setExportMsg(`Imported ${body.total} signatures (${body.added} new, ${body.updated} updated).`);
+        await fetchStats();
+        await fetchDbRows(0);
+        setDbPage(0);
+      } else {
+        setExportMsg(body.detail ?? "Import failed.");
+      }
+    } catch {
+      setExportMsg("Import failed: invalid JSON file.");
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+      setTimeout(() => setExportMsg(""), 6000);
     }
   };
 
@@ -742,6 +788,20 @@ export function AdminPage(): React.ReactElement {
           <div className="admin-export-stack">
             <button className="btn-export" onClick={handleExportJSON}>
               📥 All Signatures — JSON
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="admin-import-input"
+              onChange={(e) => handleImportJSON(e.target.files?.[0] ?? null)}
+            />
+            <button
+              className="btn-export"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+            >
+              {importing ? "Importing..." : "Import Signatures - JSON"}
             </button>
             <button className="btn-export" onClick={handleDownloadAudienceSheet}>
               🖼 Audience Sheet — PNG

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import { Signature, DisplayTheme } from "../types";
-import { FloatingItem, createItem, tickItems } from "../utils/animation";
+import { FloatingItem, createItem, createSpotlightItem, tickItems } from "../utils/animation";
 import { drawItem, setCardTheme } from "../utils/canvas";
 import { THEME_CONFIGS, Particle } from "../utils/themes";
 
@@ -28,6 +28,7 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
   const themeRef = useRef<DisplayTheme>(displayTheme);
   const cloudsRef = useRef<CloudDef[]>([]);
   const particlesRef = useRef<Particle[]>([]);
+  const dprRef = useRef<number>(1);
   const tickRef = useRef<number>(0);
 
   const initClouds = useCallback((w: number, h: number) => {
@@ -51,26 +52,31 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (displayTheme === "sky") {
-      initClouds(canvas.width, canvas.height);
+      initClouds(canvas.width / dprRef.current, canvas.height / dprRef.current);
     } else {
       cloudsRef.current = [];
     }
-    particlesRef.current = THEME_CONFIGS[displayTheme].initParticles(canvas.width, canvas.height);
+    particlesRef.current = THEME_CONFIGS[displayTheme].initParticles(
+      canvas.width / dprRef.current,
+      canvas.height / dprRef.current,
+    );
   }, [displayTheme, initClouds]);
 
-  // Sync items with signatures prop
+  // Sync items with signatures prop. Realtime arrivals are added by the
+  // spotlight effect below so they can enter from center before floating.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const existingIds = new Set(itemsRef.current.map((i) => i.sig.id));
     for (const sig of signatures) {
+      if (newSig?.id === sig.id) continue;
       if (!existingIds.has(sig.id)) {
-        const item = createItem(sig, canvas.width, canvas.height);
+        const item = createItem(sig, canvas.width / dprRef.current, canvas.height / dprRef.current);
         item.entryProgress = 1;
         itemsRef.current.push(item);
       }
     }
-  }, [signatures]);
+  }, [signatures, newSig]);
 
   // New real-time signature
   useEffect(() => {
@@ -78,19 +84,48 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (!itemsRef.current.some((i) => i.sig.id === newSig.id)) {
-      itemsRef.current.push(createItem(newSig, canvas.width, canvas.height));
+      // Small delay lets the thank-you announcement read before the card arrives.
+      const timer = setTimeout(() => {
+        if (!canvasRef.current) return;
+        if (!itemsRef.current.some((i) => i.sig.id === newSig.id)) {
+          itemsRef.current.push(
+            createSpotlightItem(
+              newSig,
+              canvasRef.current!.width / dprRef.current,
+              canvasRef.current!.height / dprRef.current,
+            ),
+          );
+        }
+      }, 350);
+      return () => clearTimeout(timer);
     }
   }, [newSig]);
 
   const resize = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    if (themeRef.current === "sky") {
-      initClouds(canvas.width, canvas.height);
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    dprRef.current = dpr;
+    // Set backing store size to device pixels
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    // Keep CSS size in logical pixels
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      // @ts-ignore - some older TS lib defs lack this property
+      if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = "high";
     }
-    particlesRef.current = THEME_CONFIGS[themeRef.current].initParticles(canvas.width, canvas.height);
+    if (themeRef.current === "sky") {
+      initClouds(canvas.width / dprRef.current, canvas.height / dprRef.current);
+    }
+    particlesRef.current = THEME_CONFIGS[themeRef.current].initParticles(
+      canvas.width / dprRef.current,
+      canvas.height / dprRef.current,
+    );
   }, [initClouds]);
 
   useEffect(() => {
@@ -110,8 +145,8 @@ export function FloatingWall({ signatures, newSig, displayTheme }: Props): React
       bgHueRef.current = (bgHueRef.current + dt * 1.5) % 360;
       tickRef.current += dt;
 
-      const W = canvas.width;
-      const H = canvas.height;
+      const W = canvas.width / dprRef.current;
+      const H = canvas.height / dprRef.current;
       const theme = themeRef.current;
       const tick = tickRef.current;
 

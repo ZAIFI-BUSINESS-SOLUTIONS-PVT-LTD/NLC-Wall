@@ -1,8 +1,7 @@
 import { FloatingItem, CARD_PALETTES } from "./animation";
 import { DisplayTheme } from "../types";
 import { THEME_CONFIGS } from "./themes";
-
-const FONT_STACK = "'Noto Sans Tamil', Latha, sans-serif";
+import { scriptMultiplier, FLOATING_FONT, FONT_STACK } from "./textSizing";
 
 let _cardTheme: DisplayTheme = "sky";
 export function setCardTheme(theme: DisplayTheme): void {
@@ -52,13 +51,18 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
     textColor = cardStyle.textColor!;
   }
 
+  const pulseScale = isNew ? 1 + Math.sin(item.age * 10) * 0.03 : 1;
+
   ctx.save();
   ctx.globalAlpha = opacity;
   ctx.translate(x, y);
   ctx.rotate((rotation * Math.PI) / 180);
-  ctx.scale(scale, scale);
+  ctx.scale(scale * pulseScale, scale * pulseScale);
 
-  const fontSize = sig.signature ? 16 : 18;
+  // Adaptive floating card font sizing for improved readability.
+  const base = sig.signature ? FLOATING_FONT.withSig : FLOATING_FONT.noSig;
+  const mult = scriptMultiplier(sig.name ?? "");
+  let fontSize = Math.min(Math.round(base * mult), FLOATING_FONT.max);
   ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
   const padX = 16;
   const padY = 10;
@@ -66,6 +70,13 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
   const MAX_TEXT_W = 560; // cap so no card ever exceeds ~600px wide
   let displayName = sig.name;
   let textW = ctx.measureText(displayName).width;
+  // If text too wide, try reducing font size first (preserve design proportions),
+  // then fall back to truncation with ellipsis.
+  while (textW > MAX_TEXT_W && fontSize > FLOATING_FONT.min) {
+    fontSize -= 1;
+    ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
+    textW = ctx.measureText(displayName).width;
+  }
   if (textW > MAX_TEXT_W) {
     while (textW > MAX_TEXT_W && displayName.length > 1) {
       displayName = displayName.slice(0, -1);
@@ -81,8 +92,9 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: FloatingItem): voi
 
   // Glow halo for new entries
   if (isNew) {
+    const haloAlpha = 0.4 + Math.sin(item.age * 10) * 0.18;
     ctx.save();
-    ctx.globalAlpha = opacity * glowAlpha * 0.5;
+    ctx.globalAlpha = opacity * glowAlpha * haloAlpha;
     ctx.shadowColor = palette.glow;
     ctx.shadowBlur = 36;
     ctx.fillStyle = `${palette.border}30`;

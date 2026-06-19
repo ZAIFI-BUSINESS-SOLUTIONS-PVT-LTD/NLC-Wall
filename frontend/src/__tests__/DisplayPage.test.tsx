@@ -4,6 +4,7 @@ import { render, screen, act } from "@testing-library/react";
 // Capture the WS handler the page registers so the test can drive events.
 const hoisted = vi.hoisted(() => ({
   handler: null as null | ((e: unknown) => void),
+  floatingWallProps: null as null | { newSig: null | { id: string; name: string } },
 }));
 
 vi.mock("../hooks/useWebSocket", () => ({
@@ -14,7 +15,10 @@ vi.mock("../hooks/useWebSocket", () => ({
 
 // Replace the canvas-heavy children with inert stubs.
 vi.mock("../components/FloatingWall", () => ({
-  FloatingWall: () => null,
+  FloatingWall: (props: { newSig: null | { id: string; name: string } }) => {
+    hoisted.floatingWallProps = props;
+    return null;
+  },
 }));
 vi.mock("../components/MascotCorner", () => ({
   MascotCorner: () => null,
@@ -30,6 +34,7 @@ function send(event: unknown) {
 
 beforeEach(() => {
   hoisted.handler = null;
+  hoisted.floatingWallProps = null;
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({ ok: true, json: async () => ({ theme: "sky" }) }),
@@ -40,7 +45,7 @@ describe("DisplayPage", () => {
   it("renders the wall HUD", () => {
     render(<DisplayPage />);
     expect(screen.getByText("NLC Neyveli Book Fair")).toBeInTheDocument();
-    expect(screen.getByText("Live Sign Wall")).toBeInTheDocument();
+    expect(screen.getByText("NLCIL VIGILANCE")).toBeInTheDocument();
     expect(screen.getByText(/signed the wall/)).toBeInTheDocument();
   });
 
@@ -94,6 +99,21 @@ describe("DisplayPage", () => {
     });
     // No throw and the page is still mounted with its HUD.
     expect(screen.getByText(/signed the wall/)).toBeInTheDocument();
+    expect(hoisted.floatingWallProps?.newSig).toEqual(
+      expect.objectContaining({ id: "9", name: "Fresh" }),
+    );
+  });
+
+  it("does not spotlight newly broadcast chief guest signatures", () => {
+    render(<DisplayPage />);
+    send({ event: "init", data: [] });
+    send({
+      event: "new_signature",
+      data: { id: "cg-9", name: "VIP Fresh", signature: null, timestamp: 9, is_chief_guest: true },
+    });
+
+    expect(screen.getByText("VIP Fresh")).toBeInTheDocument();
+    expect(hoisted.floatingWallProps?.newSig).toBeNull();
   });
 
   it("updates a signature when an update_signature event arrives", () => {

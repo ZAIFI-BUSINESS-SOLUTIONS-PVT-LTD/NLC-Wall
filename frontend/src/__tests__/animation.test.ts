@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createItem, tickItems, CARD_PALETTES, FloatingItem } from "../utils/animation";
+import { createItem, createSpotlightItem, tickItems, CARD_PALETTES, FloatingItem } from "../utils/animation";
 import { Signature } from "../types";
 
 const W = 1920;
@@ -79,6 +79,25 @@ describe("createItem", () => {
   });
 });
 
+describe("createSpotlightItem", () => {
+  it("starts a new realtime signature at the center in spotlight mode", () => {
+    const item = createSpotlightItem(makeSig("spotlight"), W, H);
+
+    expect(item.x).toBe(Math.round(W / 2));
+    expect(item.y).toBe(Math.round(H / 2));
+    expect(item.spotlight).toBe(true);
+    expect(item.scale).toBeCloseTo(1.6);
+    expect(item.opacity).toBe(1);
+    expect(item.glowAlpha).toBe(1);
+  });
+
+  it("keeps a normal drift velocity for after the spotlight handoff", () => {
+    const item = createSpotlightItem(makeSig("spotlight"), W, H);
+
+    expect(Math.hypot(item.vx, item.vy)).toBeGreaterThan(0);
+  });
+});
+
 describe("tickItems – glow", () => {
   it("only the newest (last) item glows", () => {
     const items = makeItems(12);
@@ -87,6 +106,31 @@ describe("tickItems – glow", () => {
     for (let i = 0; i < items.length - 1; i++) {
       expect(items[i].glowAlpha).toBe(0);
     }
+  });
+});
+
+describe("tickItems – spotlight", () => {
+  it("moves a spotlight item away from center toward its target", () => {
+    const item = createSpotlightItem(makeSig("spotlight"), W, H);
+    const startX = item.x;
+    const startY = item.y;
+    const targetX = item.spotTargetX!;
+    const targetY = item.spotTargetY!;
+
+    tickItems([item], 0.2, W, H, 1);
+
+    expect(Math.abs(item.x - targetX)).toBeLessThan(Math.abs(startX - targetX));
+    expect(Math.abs(item.y - targetY)).toBeLessThan(Math.abs(startY - targetY));
+  });
+
+  it("hands a spotlight item back to normal floating after arrival", () => {
+    const item = createSpotlightItem(makeSig("spotlight"), W, H);
+
+    tickItems([item], 1.2, W, H, 1);
+
+    expect(item.spotlight).toBe(false);
+    expect(item.postHighlight).toBeGreaterThan(0);
+    expect(Math.hypot(item.vx, item.vy)).toBeGreaterThan(0);
   });
 });
 

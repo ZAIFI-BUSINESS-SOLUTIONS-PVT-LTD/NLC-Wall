@@ -31,12 +31,23 @@ export interface FloatingItem {
   glowAlpha: number;
   entryProgress: number;
   age: number;
+  // Spotlight flow fields (optional)
+  spotlight?: boolean;
+  spotStartX?: number;
+  spotStartY?: number;
+  spotTargetX?: number;
+  spotTargetY?: number;
+  spotTime?: number;
+  postHighlight?: number;
   sineOffset: number;
 }
 
 const FLOAT_SPEED_MIN = 0.12;
 const FLOAT_SPEED_MAX = 0.38;
 const ENTRY_DURATION = 0.7;
+const NEWEST_HIGHLIGHT_DURATION = 15; // seconds
+const SPOTLIGHT_MOVE_DURATION = 1.1; // seconds for center->target travel
+const POST_ARRIVAL_HIGHLIGHT = 5.0; // seconds to keep slight highlight after arrival
 
 // Bottom strip reserved for Chief Guest cards (horizontal row, up to 5 cards).
 // 5 cards × 130px + 4 gaps × 8px + 24px left margin ≈ 710px wide, 100px tall.
@@ -83,6 +94,45 @@ export function createItem(sig: Signature, canvasW: number, canvasH: number): Fl
   };
 }
 
+export function createSpotlightItem(sig: Signature, canvasW: number, canvasH: number): FloatingItem {
+  const angle = rand(0, Math.PI * 2);
+  const speed = rand(FLOAT_SPEED_MIN, FLOAT_SPEED_MAX);
+  let targetX = rand(180, canvasW - 180);
+  let targetY = rand(120, canvasH - 120);
+  for (let i = 0; i < 16; i++) {
+    const inCgZone = targetX < CG_ZONE_W && targetY > canvasH - CG_ZONE_H;
+    const inPledgeZone = targetX < PLEDGE_ZONE_W && targetY > canvasH * 0.14 && targetY < canvasH * 0.86;
+    if (!inCgZone && !inPledgeZone) break;
+    targetX = rand(180, canvasW - 180);
+    targetY = rand(120, canvasH - 120);
+  }
+  const cx = Math.round(canvasW / 2);
+  const cy = Math.round(canvasH / 2);
+  return {
+    sig,
+    paletteIdx: paletteForId(sig.id),
+    x: cx,
+    y: cy,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    rotation: rand(-6, 6),
+    rotationSpeed: rand(-2.2, 2.2),
+    scale: 1.6,
+    opacity: 1,
+    glowAlpha: 1,
+    entryProgress: 1,
+    age: 0,
+    spotlight: true,
+    spotStartX: cx,
+    spotStartY: cy,
+    spotTargetX: targetX,
+    spotTargetY: targetY,
+    spotTime: 0,
+    postHighlight: POST_ARRIVAL_HIGHLIGHT,
+    sineOffset: rand(0, Math.PI * 2),
+  };
+}
+
 export function tickItems(
   items: FloatingItem[],
   dt: number,
@@ -99,13 +149,47 @@ export function tickItems(
 
     // reverseRank: 0 = newest item, grows as item gets older
     const reverseRank = totalCount - 1 - idx;
+    const isNewest = reverseRank === 0;
+    const highlightRemaining = Math.max(0, NEWEST_HIGHLIGHT_DURATION - item.age);
 
-    // Glow only for the newest item
-    item.glowAlpha = reverseRank === 0 ? 1.0 : 0;
+    // Spotlight arrival handling: if item is in spotlight flow, animate center->target
+    if (item.spotlight) {
+      item.spotTime = (item.spotTime ?? 0) + dt;
+      const t = Math.min(1, (item.spotTime ?? 0) / SPOTLIGHT_MOVE_DURATION);
+      const eased = easeOut(t);
+      const sx = item.spotStartX ?? item.x;
+      const sy = item.spotStartY ?? item.y;
+      const tx = item.spotTargetX ?? item.x;
+      const ty = item.spotTargetY ?? item.y;
+      item.x = lerp(sx, tx, eased);
+      item.y = lerp(sy, ty, eased);
+      // maintain highlight during transit
+      item.glowAlpha = 0.9;
+      // gently reduce scale toward normal while moving
+      item.scale = lerp(1.6, 1.0, eased);
+      // Once arrived, mark spotlight done and keep postHighlight active
+      if (t >= 1) {
+        item.spotlight = false;
+        item.postHighlight = POST_ARRIVAL_HIGHLIGHT;
+      }
+      // Skip physics/separation while spotlighting
+      return;
+    }
 
     const sineX = Math.sin(item.age * 0.35 + item.sineOffset) * 0.28;
     item.x += (item.vx + sineX) * dt * 60;
     item.y += item.vy * dt * 60;
+
+    // Handle post-arrival highlight (gentle pulse)
+    if ((item.postHighlight ?? 0) > 0) {
+      item.postHighlight = Math.max(0, (item.postHighlight ?? 0) - dt);
+      item.glowAlpha = 0.6 + Math.sin(item.age * 6) * 0.12;
+    } else {
+      // Glow only for the newest item while its 15s highlight is active.
+      // Give newest item a full highlight so it reads clearly and tests expecting
+      // a fully-highlighted newest item remain stable.
+      item.glowAlpha = isNewest && highlightRemaining > 0 ? 1.0 : 0;
+    }
 
     const halfW = estimateHalfW(item);
     const halfH = estimateHalfH(item);

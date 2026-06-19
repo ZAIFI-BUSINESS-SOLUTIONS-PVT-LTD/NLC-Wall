@@ -3,6 +3,7 @@ import { Signature, WSEvent, DisplayTheme, PledgeConfig } from "../types";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { FloatingWall } from "../components/FloatingWall";
 import { MascotCorner } from "../components/MascotCorner";
+import { CgCard } from "../components/CgCard";
 
 // Animates a number rolling from its previous value to a new target.
 function useRollingCount(target: number): number {
@@ -34,14 +35,15 @@ function useRollingCount(target: number): number {
 export function DisplayPage(): React.ReactElement {
   const [sigs, setSigs] = useState<Signature[]>([]);
   const [newSig, setNewSig] = useState<Signature | null>(null);
+  const [arrivalCount, setArrivalCount] = useState(0);
   const [displayTheme, setDisplayTheme] = useState<DisplayTheme>("sky");
   const [pledgeConfig, setPledgeConfig] = useState<PledgeConfig | null>(null);
   const [pledgeIdx, setPledgeIdx] = useState(0);
   const newSigTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-refresh every 10 minutes to prevent cards from settling in corners
+  // Auto-refresh every 2 minutes to keep the display wall fresh during events.
   useEffect(() => {
-    const t = setTimeout(() => window.location.reload(), 10 * 60 * 1000);
+    const t = setTimeout(() => window.location.reload(), 2 * 60 * 1000);
     return () => clearTimeout(t);
   }, []);
 
@@ -88,6 +90,11 @@ export function DisplayPage(): React.ReactElement {
       .then((r) => r.json())
       .then((d) => { if (d.theme) setDisplayTheme(d.theme); })
       .catch(() => {});
+    // Also fetch current pledge config so display loads initial texts
+    fetch("/admin/pledge-config")
+      .then((r) => r.json())
+      .then((d) => { if (d) setPledgeConfig(d); })
+      .catch(() => {});
   }, []);
 
   const handleWS = useCallback((event: WSEvent) => {
@@ -97,6 +104,7 @@ export function DisplayPage(): React.ReactElement {
       setSigs((prev) => [...prev, event.data]);
       if (!event.data.is_chief_guest) {
         setNewSig(event.data);
+        setArrivalCount((c) => c + 1);
         if (newSigTimer.current) clearTimeout(newSigTimer.current);
         newSigTimer.current = setTimeout(() => setNewSig(null), 5000);
       }
@@ -129,9 +137,10 @@ export function DisplayPage(): React.ReactElement {
       <img src="/nlclogo70th.png" alt="NLC" className="hud-logo-corner" />
 
       {/* Top-left HUD */}
+        <div className="vigil-header">Live Sign Wall</div>
       <div className="display-hud">
         <div className="hud-event">NLC Neyveli Book Fair</div>
-        <div className="hud-title">Live Sign Wall</div>
+        <div className="hud-title">NLCIL VIGILANCE</div>
         <div className="hud-count">
           <span className="hud-count-num">{rollingCount}</span>
           <span className="hud-count-label"> signed the wall</span>
@@ -141,15 +150,10 @@ export function DisplayPage(): React.ReactElement {
       {/* Chief Guest pinned panel — top-left, always visible while CG sigs exist */}
       {activeCgSigs.length > 0 && (
         <div className="cg-banner">
-          <div className="cg-banner-title">★ Chief Guest</div>
+            <div className="cg-banner-title">★ DIGNITARIES</div>
           <div className="cg-cards">
             {activeCgSigs.map((s) => (
-              <div key={s.id} className="cg-card">
-                {s.signature && (
-                  <img src={s.signature} className="cg-card-sig" alt="signature" />
-                )}
-                <div className="cg-card-name">{s.name}</div>
-              </div>
+              <CgCard key={s.id} name={s.name} signature={s.signature} />
             ))}
           </div>
         </div>
@@ -157,7 +161,7 @@ export function DisplayPage(): React.ReactElement {
 
       {/* Rotating multilingual pledge panel — Tamil → Hindi → English */}
       {currentPledge && (
-        <div className="pledge-panel" key={currentPledge.lang}>
+        <div className="pledge-panel">
           <div className="pledge-panel-head">
             <span className="pledge-panel-badge">{currentPledge.label}</span>
             {pledgeItems.length > 1 && (
@@ -181,7 +185,7 @@ export function DisplayPage(): React.ReactElement {
       )}
 
       {/* Mascot — slides up from bottom-right like a news channel footer */}
-      <MascotCorner />
+      <MascotCorner arrivalCount={arrivalCount} latestName={newSig?.name} />
 
     </div>
   );

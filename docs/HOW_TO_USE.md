@@ -131,7 +131,8 @@ Install the app and point it to `http://192.168.1.10:8000/`
 4. Press **F11** for fullscreen
 5. Set screen sleep → **Never** in Windows display settings
 
-The display page auto-connects via WebSocket — no manual refresh needed.
+The display page auto-connects via WebSocket and auto-refreshes every 2 minutes
+to keep the wall fresh during long-running events.
 
 ---
 

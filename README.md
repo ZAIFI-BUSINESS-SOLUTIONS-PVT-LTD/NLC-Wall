@@ -119,6 +119,7 @@ Cards recede into the background by count, not by time:
 | 33+ | evicted from canvas | — |
 
 The newest arrival enters with a scale-in zoom + glow pulse. Canvas is capped at **32 live items** — the renderer stays smooth even at 80 signs/min.
+The display wall also auto-refreshes every **2 minutes** to keep long-running screens fresh.
 
 ### Themes
 

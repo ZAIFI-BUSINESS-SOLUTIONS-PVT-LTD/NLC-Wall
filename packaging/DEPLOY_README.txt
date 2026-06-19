@@ -70,6 +70,7 @@ Replace 192.168.1.10 with YOUR server IP from Step 3.
 
   On the BIG DISPLAY laptop (connected to TV/projector via HDMI):
      http://192.168.1.10:8000/display     (press F11 for fullscreen)
+     The display wall auto-refreshes every 2 minutes to keep the screen fresh.
 
   On any ADMIN device:
      http://192.168.1.10:8000/admin

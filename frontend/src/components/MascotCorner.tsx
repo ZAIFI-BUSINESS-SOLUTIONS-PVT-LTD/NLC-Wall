@@ -61,9 +61,17 @@ function Sparkle({ x, y, size, delay }: { x: number; y: number; size: number; de
   );
 }
 
-export function MascotCorner() {
+export function MascotCorner({
+  arrivalCount,
+  latestName,
+}: {
+  arrivalCount?: number;
+  latestName?: string;
+}) {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [forcedVisible, setForcedVisible] = useState(false);
+  const [showThanks, setShowThanks] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,20 +105,21 @@ export function MascotCorner() {
     return () => { cancelled = true; };
   }, []);
 
+  // When arrivalCount increments, temporarily force mascot visible and show "Thank You!"
+  useEffect(() => {
+    if (!arrivalCount) return;
+    setForcedVisible(true);
+    setShowThanks(true);
+    // Keep mascot/message for ~4 seconds
+    const t1 = setTimeout(() => setShowThanks(false), 4200);
+    const t2 = setTimeout(() => setForcedVisible(false), 4600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [arrivalCount]);
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        right: 24,
-        zIndex: 9999,
-        pointerEvents: "none",
-        width: 200,
-        height: 300,
-      }}
-    >
+    <div className="mascot-corner">
       <AnimatePresence>
-        {visible && (
+        {(visible || forcedVisible) && (
           <motion.div
             key="mascot-wrapper"
             style={{ position: "absolute", bottom: 0, right: 0, width: "100%", height: "100%" }}
@@ -219,6 +228,21 @@ export function MascotCorner() {
               animate={{ scaleX: [1, 0.88, 1], opacity: [0.6, 0.4, 0.6] }}
               transition={{ duration: 2.0, repeat: Infinity, ease: "easeInOut" }}
             />
+          </motion.div>
+        )}
+        {showThanks && (
+          <motion.div
+            key="thanks"
+            className="signature-thanks"
+            initial={{ opacity: 0, y: 16, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.96 }}
+            transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <span className="signature-thanks-kicker">New signature added</span>
+            <span className="signature-thanks-name">
+              {latestName ? `Thank you, ${latestName}` : "Thank you!"}
+            </span>
           </motion.div>
         )}
       </AnimatePresence>

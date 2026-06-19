@@ -194,12 +194,16 @@ html, body, #root {
   padding: 16px 18px;
   font-size: 22px;
   font-family: var(--font);
-  background: var(--input-bg);
-  border: 1.5px solid var(--input-border);
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid rgba(255,255,255,0.30);
   border-radius: 12px;
-  color: var(--input-text);
+  color: #ffffff;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.name-input::placeholder {
+  color: rgba(255,255,255,0.70);
 }
 
 .name-input:focus {
@@ -223,7 +227,7 @@ html, body, #root {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  color: var(--sig-label-color);
+  color: #ffffff;
   text-transform: uppercase;
 }
 
@@ -341,17 +345,37 @@ html, body, #root {
 .display-hud {
   position: absolute;
   top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  background: rgba(255,255,255,0.88);
+  border: 1px solid rgba(255,255,255,0.96);
+  border-radius: 16px;
+  padding: 14px 22px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 4px 26px rgba(0,40,120,0.18);
+  max-width: min(560px, 90vw);
+}
+
+.vigil-header {
+  position: absolute;
+  top: 22px;
   left: 24px;
   pointer-events: none;
   user-select: none;
-  background: rgba(255,255,255,0.82);
-  border: 1px solid rgba(255,255,255,0.92);
-  border-radius: 16px;
-  padding: 12px 18px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 2px 20px rgba(0,40,120,0.16);
-  max-width: 380px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #1d2b5c;
+  background: rgba(255,255,255,0.88);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 999px;
+  padding: 10px 18px;
+  box-shadow: 0 3px 16px rgba(0,0,0,0.12);
+  z-index: 13;
 }
 
 .hud-logo-corner {
@@ -992,6 +1016,124 @@ html, body, #root {
 @keyframes toastIn  { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
 @keyframes toastOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-8px); } }
 
+.mascot-corner {
+  position: fixed;
+  right: 24px;
+  bottom: 0;
+  z-index: 9999;
+  width: 200px;
+  height: 300px;
+  pointer-events: none;
+}
+
+.signature-thanks {
+  position: absolute;
+  right: 196px;
+  bottom: 82px;
+  min-width: 270px;
+  max-width: min(440px, calc(100vw - 260px));
+  padding: 14px 20px 15px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 248, 255, 0.94)),
+    radial-gradient(circle at 18% 0%, rgba(245, 217, 126, 0.28), transparent 42%);
+  border: 1px solid rgba(0, 91, 187, 0.18);
+  box-shadow:
+    0 16px 42px rgba(0, 40, 120, 0.20),
+    0 2px 10px rgba(0, 0, 0, 0.10);
+  color: #0f2b58;
+  text-align: left;
+  overflow-wrap: anywhere;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.signature-thanks::after {
+  content: "";
+  position: absolute;
+  right: -12px;
+  bottom: 28px;
+  width: 24px;
+  height: 24px;
+  background: rgba(246, 250, 255, 0.96);
+  border-top: 1px solid rgba(0, 91, 187, 0.14);
+  border-right: 1px solid rgba(0, 91, 187, 0.14);
+  transform: rotate(45deg);
+}
+
+.signature-thanks-kicker,
+.signature-thanks-name {
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+.signature-thanks-kicker {
+  margin-bottom: 4px;
+  color: #87620b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.signature-thanks-name {
+  color: #0d3f86;
+  font-size: clamp(18px, 1.7vw, 28px);
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.display-page--space .signature-thanks {
+  background:
+    linear-gradient(135deg, rgba(9, 17, 42, 0.94), rgba(2, 8, 24, 0.90)),
+    radial-gradient(circle at 18% 0%, rgba(0, 212, 255, 0.20), transparent 42%);
+  border-color: rgba(0, 212, 255, 0.28);
+  box-shadow:
+    0 18px 52px rgba(0, 0, 0, 0.48),
+    0 0 28px rgba(0, 212, 255, 0.12);
+}
+
+.display-page--space .signature-thanks::after {
+  background: rgba(6, 13, 34, 0.94);
+  border-color: rgba(0, 212, 255, 0.20);
+}
+
+.display-page--space .signature-thanks-kicker {
+  color: var(--gold-light);
+}
+
+.display-page--space .signature-thanks-name {
+  color: #e8f8ff;
+}
+
+@media (max-width: 760px) {
+  .mascot-corner {
+    right: 10px;
+    width: 170px;
+  }
+
+  .signature-thanks {
+    right: 144px;
+    bottom: 94px;
+    min-width: 210px;
+    max-width: calc(100vw - 170px);
+    padding: 12px 15px;
+  }
+
+  .signature-thanks-name {
+    font-size: 18px;
+  }
+
+  .pledge-panel {
+    top: 150px;
+    bottom: 124px;
+    left: 16px;
+    width: calc(100vw - 32px);
+  }
+}
+
 /* ─── DISPLAY WALL — rolling counter label ───────────────────────────────── */
 
 .hud-count {
@@ -1582,29 +1724,39 @@ html, body, #root {
 
 .pledge-panel {
   position: absolute;
-  top: 50%;
+  top: clamp(108px, 14vh, 150px);
+  bottom: 132px;
   left: 16px;
-  transform: translateY(-50%);
-  width: min(30vw, 420px);
-  max-height: 78vh;
+  width: min(34vw, 480px);
+  min-height: 0;
+  max-height: none;
   display: flex;
   flex-direction: column;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.82);
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   pointer-events: none;
   user-select: none;
   z-index: 12;
-  animation: pledgeFade 0.7s ease;
+  overflow: hidden;
+  animation: pledgeSettle 0.45s ease-out;
 }
 
-@keyframes pledgeFade {
-  from { opacity: 0; transform: translateY(-50%) translateX(-18px); }
-  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+@keyframes pledgeSettle {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
 }
 
 .pledge-panel-head {
@@ -1646,13 +1798,13 @@ html, body, #root {
 }
 
 .pledge-panel-body {
-  font-size: clamp(8px, 0.72vw, 10.5px);
-  line-height: 1.45;
+  font-size: clamp(11px, 0.95vw, 13px);
+  line-height: 1.6;
   color: #1a2040;
   white-space: pre-wrap;
   word-break: break-word;
   overflow: hidden;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 /* Dark display themes — panel goes translucent-dark for contrast */
@@ -1770,3 +1922,12 @@ html, body, #root {
 }
 
 /* cg-card-sig stays white on all themes — dark ink needs light paper */
+
+@media (max-width: 760px) {
+  .pledge-panel {
+    top: 150px;
+    bottom: 124px;
+    left: 16px;
+    width: calc(100vw - 32px);
+  }
+}

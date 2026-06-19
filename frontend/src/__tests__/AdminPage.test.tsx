@@ -18,6 +18,7 @@ function routedFetch() {
     if (url.includes("/admin/display-theme")) return jsonResp({ theme: "sky" });
     if (url.includes("/admin/pledge-config")) return jsonResp(PLEDGE);
     if (url.includes("/admin/chief-guest-config")) return jsonResp(CG);
+    if (url.includes("/admin/import-signatures")) return jsonResp({ status: "imported", total: 1, added: 1, updated: 0 });
     if (url.includes("/admin/db/signatures")) return jsonResp({ total: 0, items: [] });
     if (url.includes("/admin/signatures")) return jsonResp({ status: "cleared" });
     return jsonResp({});
@@ -31,6 +32,7 @@ function routedFetchWithRows(rows: unknown[], total = rows.length) {
     if (url.includes("/admin/display-theme")) return jsonResp({ theme: "sky" });
     if (url.includes("/admin/pledge-config")) return jsonResp(PLEDGE);
     if (url.includes("/admin/chief-guest-config")) return jsonResp(CG);
+    if (url.includes("/admin/import-signatures")) return jsonResp({ status: "imported", total: 1, added: 1, updated: 0 });
     if (url.includes("/admin/db/signatures") && init?.method === "PUT") return jsonResp({ status: "updated" });
     if (url.includes("/admin/db/signatures") && init?.method === "DELETE") return jsonResp({ status: "deleted" });
     if (url.includes("/admin/db/signatures")) return jsonResp({ total, items: rows });
@@ -112,6 +114,34 @@ describe("AdminPage", () => {
         expect.objectContaining({ method: "DELETE" }),
       );
     });
+  });
+
+  it("imports a SignWall JSON export from the admin panel", async () => {
+    const fetchMock = routedFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const { container } = render(<AdminPage />);
+
+    await user.click(await screen.findByRole("button", { name: /Import Signatures - JSON/ }));
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const file = new File(
+      [JSON.stringify([{ id: "sig-1", name: "Imported", signature: null, timestamp: 1, is_chief_guest: false }])],
+      "signatures.json",
+      { type: "application/json" },
+    );
+    await user.upload(input, file);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/admin/import-signatures",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const call = fetchMock.mock.calls.find((c) => c[0] === "/admin/import-signatures")!;
+    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual([
+      { id: "sig-1", name: "Imported", signature: null, timestamp: 1, is_chief_guest: false },
+    ]);
+    expect(await screen.findByText("Imported 1 signatures (1 new, 0 updated).")).toBeInTheDocument();
   });
 
   it("exposes all seven display-wall theme options", async () => {

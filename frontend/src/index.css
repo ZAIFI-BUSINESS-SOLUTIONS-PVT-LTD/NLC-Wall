@@ -856,6 +856,10 @@ html, body, #root {
 }
 .btn-export:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.admin-import-input {
+  display: none;
+}
+
 .btn-export-server {
   border-style: dashed;
 }

@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -99,6 +99,16 @@ async def submit(request: Request, body: SubmitRequest) -> SubmitResponse:
 @app.get("/signatures")
 async def get_signatures() -> list:
     return [s.model_dump() for s in storage.get_all()]
+
+
+@app.post("/admin/import-signatures")
+async def admin_import_signatures(signatures: list[Signature] = Body(...)) -> JSONResponse:
+    result = storage.import_many(signatures)
+    await manager.broadcast({
+        "event": "init",
+        "data": [s.model_dump() for s in storage.get_all()],
+    })
+    return JSONResponse({"status": "imported", **result})
 
 
 @app.get("/health", response_model=HealthResponse)

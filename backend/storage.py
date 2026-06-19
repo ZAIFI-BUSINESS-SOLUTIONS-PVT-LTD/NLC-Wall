@@ -50,6 +50,28 @@ def add(sig: Signature) -> None:
     database.db_add(sig)
 
 
+def import_many(signatures: List[Signature]) -> dict:
+    """Merge imported signatures by id, preserving only the newest in memory."""
+    added = 0
+    updated = 0
+    with _lock:
+        existing = {sig.id: sig for sig in _store}
+        for sig in signatures:
+            if sig.id in existing:
+                updated += 1
+            else:
+                added += 1
+            existing[sig.id] = sig
+        merged = sorted(existing.values(), key=lambda sig: sig.timestamp)
+        _store[:] = merged[-MAX_SIGNATURES:]
+
+    for sig in signatures:
+        _save_to_disk(sig)
+        database.db_add(sig)
+
+    return {"added": added, "updated": updated, "total": len(signatures)}
+
+
 def get_all() -> List[Signature]:
     with _lock:
         return list(_store)

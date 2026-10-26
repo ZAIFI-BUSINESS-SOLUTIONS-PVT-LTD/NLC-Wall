@@ -9,7 +9,6 @@ backend/*.pyc
 dist/
 build/
 *.egg
-.env
 venv/
 env/
 
@@ -38,3 +37,5 @@ branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
 .gitignore
+config.bat
+node_modules
